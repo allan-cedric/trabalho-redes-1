@@ -1,4 +1,4 @@
-#include "../kermit.h"
+#include "kermit.h"
 
 int main()
 {
