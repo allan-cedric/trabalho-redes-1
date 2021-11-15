@@ -15,9 +15,6 @@
 
 #define ERROR_CODE -1
 
-#define BUF_SIZE (1024 + 1)
-#define MSG_SIZE (16)
-
 /*!
     @brief  Cria um raw socket
 
