@@ -1,7 +1,7 @@
 #ifndef __KERMIT_H__
 #define __KERMIT_H__
 
-#include "rawSocket.h"
+#include "raw_socket.h"
 
 #define INIT_MARKER (0x7E)
 #define CLI_ADDR (0x1)
