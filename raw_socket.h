@@ -4,12 +4,14 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <net/ethernet.h>
 #include <linux/if_packet.h>
 #include <linux/if.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <errno.h>
 #include <unistd.h>
 #include <netinet/in.h>
 
@@ -50,5 +52,12 @@ int sendto_rawsocket(int socket_fd, void *buf, size_t buf_size, struct sockaddr_
     @return Quantidade de bytes lidos
 */
 int recvfrom_rawsocket(int socket_fd, void *buf, size_t buf_size, struct sockaddr_ll *addr, socklen_t *addr_len);
+
+/*!
+    @brief  Calcula o tempo corrente do programa
+
+    @return Tempo corrente em milissegundos 
+*/
+double timestamp();
 
 #endif

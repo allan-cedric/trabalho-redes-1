@@ -3,4 +3,6 @@
 
 #include "kermit.h"
 
+int valid_kermit_pckt_for_ser(kermit_pckt_t *kpckt);
+
 #endif

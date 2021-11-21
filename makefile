@@ -16,6 +16,8 @@ all: create_dirs $(CLI_EXEC) $(SER_EXEC)
 
 create_dirs:
 	mkdir -p client server
+	mkdir -p server/dir1 server/dir2 server/dir3
+	touch server/dir1/arq1 server/dir2/arq2
 
 $(CLI_EXEC): $(LIB_OBJS) $(LIB_OBJS_CLI) $(LIB_OBJ_CLI_EXEC)
 	$(CC) $(LIB_OBJS) $(LIB_OBJS_CLI) $(LIB_OBJ_CLI_EXEC) -o $(CLI_EXEC)
