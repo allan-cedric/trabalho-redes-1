@@ -19,6 +19,7 @@ int main()
     int error_code, cmd_type, type;
     byte_t buf[MSG_SIZE + 1];
     FILE *arq;
+
     while (1)
     {
         // --- Etapa de recepção ---
@@ -49,14 +50,13 @@ int main()
             type = kermit_pckt_recv.type;
             if (type == ACK_TYPE && arq)
             {
-                if (!fgets((char *)buf, MSG_SIZE + 1, arq))
+                if (!fgets((char *)buf, MSG_SIZE, arq))
                 {
+                    memset(buf, 0, MSG_SIZE + 1);
                     type = END_TRANS_TYPE;
                     fclose(arq);
                     arq = NULL;
                 }
-                else
-                    buf[strcspn((const char *)buf, "\n")] = 0;
             }
 
             switch (type)
@@ -90,23 +90,20 @@ int main()
                 arq = popen("ls", "r");
                 if (!arq)
                 {
-                    fprintf(stderr, "[Server] error: popen\n");
+                    fprintf(stderr, "error: popen\n");
                     exit(1);
                 }
-                fgets((char *)buf, MSG_SIZE + 1, arq);
-                buf[strcspn((const char *)buf, "\n")] = 0;
-
-                // puts(buf);
+                fgets((char *)buf, MSG_SIZE, arq);
 
                 gen_kermit_pckt(&kermit_pckt, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
-                                buf, strlen((const char *)buf), sizeof(byte_t));
+                                buf, 1, strlen((const char *)buf));
                 break;
             case ACK_TYPE:
                 switch (cmd_type)
                 {
                 case LS_TYPE:
                     gen_kermit_pckt(&kermit_pckt, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
-                                    buf, strlen((const char *)buf), sizeof(byte_t));
+                                    buf, 1, strlen((const char *)buf));
                     break;
                 case END_TRANS_TYPE:
                     gen_kermit_pckt(&kermit_pckt, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);

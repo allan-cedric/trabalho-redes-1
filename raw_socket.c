@@ -40,6 +40,9 @@ int rawsocket_connection(char *device, struct sockaddr_ll *addr)
     exit(ERROR_CODE);
   }
 
+  // Seta sendto e recvfrom como não bloqueantes (timeout)
+  fcntl(socket_fd, F_SETFL, O_NONBLOCK);
+
   return socket_fd;
 }
 

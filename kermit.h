@@ -6,7 +6,7 @@
 #define BUF_SIZE (1024 + 1)
 #define MSG_SIZE (15)
 
-#define TIMEOUT (10)
+#define TIMEOUT (5000)
 
 // --- Códigos do protocolo ---
 
@@ -26,6 +26,9 @@
 #define LINHAS_TYPE (0x4)
 #define EDIT_TYPE (0x5)
 #define COMPILAR_TYPE (0x6)
+
+#define LCD_TYPE (0x10)
+#define LLS_TYPE (0x11)
 
 // Códigos de resposta
 #define ACK_TYPE (0x8)
