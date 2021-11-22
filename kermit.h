@@ -59,13 +59,44 @@ typedef struct kermit_pckt_t
     byte_t parity;
 } kermit_pckt_t;
 
+/*!
+    @brief  Gera um pacote kermit
+
+    @param  kpckt       Pacote kermit a ser preenchido
+    @param  dest_addr   Endereço destino   
+    @param  origin_addr Endereço origem
+    @param  seq         Sequência
+    @param  type        Tipo da mensagem
+    @param  args        Mensagem
+    @param  num_args    Número de argumentos da mensagem
+    @param  args_size   Tamanho dos argumentos
+*/
 void gen_kermit_pckt(kermit_pckt_t *kpckt, int dest_addr, int origin_addr,
                      int seq, int type, void *args, size_t num_args, size_t args_size);
 
+/*!
+    @brief  Impressão formata de um pacote kermit
+
+    @param  kpckt   Pacote kermit a ser impresso
+*/
 void print_kermit_pckt(kermit_pckt_t *kpckt);
 
+/*!
+    @brief  Verifica se é um pacote kermit válido
+
+    @param  kpckt   Pacote kermit a ser verificado
+
+    @return 1 se for válido, senão 0
+*/
 int valid_kermit_pckt(kermit_pckt_t *kpckt);
 
+/*!
+    @brief  Verifica a paridade de um pacote kermit
+
+    @param  kpckt   Pacote kermit a ser verficado
+
+    @return 0 caso a paridade esteja correta, senão algo diferente de 0
+*/
 int verify_parity(kermit_pckt_t *kpckt);
 
 #endif

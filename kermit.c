@@ -14,10 +14,10 @@ void gen_kermit_pckt(kermit_pckt_t *kpckt, int dest_addr, int origin_addr,
 
     switch (kpckt->type)
     {
-    case CD_TYPE:                                  // "cd"
+    case CD_TYPE:
     case LS_CONTENT_TYPE:
-    case ERROR_TYPE:                                  // Erro
-        memcpy(kpckt->msg, args, kpckt->size); // Carrega os dados no pacote
+    case ERROR_TYPE:
+        memcpy(kpckt->msg, args, kpckt->size);
         break;
     default: // "ACK", "NACK"
         break;
