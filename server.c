@@ -48,22 +48,10 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
     if (!parity)
     {
-        type = kpckt_recv->type;
-        if (type == ACK_TYPE && arq)
-        {
-            if (!fgets((char *)buf, MSG_SIZE, arq))
-            {
-                memset(buf, 0, MSG_SIZE + 1);
-                type = END_TRANS_TYPE;
-                fclose(arq);
-                arq = NULL;
-            }
-        }
-
-        switch (type)
+        switch (kpckt_recv->type)
         {
         case CD_TYPE:
-            cmd_type = type;
+            cmd_type = CD_TYPE;
             if (!chdir((const char *)kpckt_recv->msg)) // "ACK"
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
             else // Erro
@@ -87,7 +75,7 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             }
             break;
         case LS_TYPE:
-            cmd_type = type;
+            cmd_type = LS_TYPE;
             arq = popen("ls", "r");
             if (!arq)
             {
@@ -103,18 +91,23 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             switch (cmd_type)
             {
             case LS_TYPE:
-                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
-                                buf, 1, strlen((const char *)buf));
+                if (!fgets((char *)buf, MSG_SIZE, arq))
+                {
+                    memset(buf, 0, MSG_SIZE + 1);
+                    fclose(arq);
+                    arq = NULL;
+
+                    cmd_type = END_TRANS_TYPE;
+                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+                }else
+                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
+                                    buf, 1, strlen((const char *)buf));
                 break;
             case END_TRANS_TYPE:
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
             default:
                 break;
             }
-            break;
-        case END_TRANS_TYPE:
-            cmd_type = type;
-            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
             break;
         default:
             break;
