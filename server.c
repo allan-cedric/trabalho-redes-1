@@ -9,7 +9,7 @@ int socket_fd;
 unsigned int seq_send = 0, seq_recv = 0;
 int error_code, cmd_type, type;
 byte_t buf[MSG_SIZE + 1];
-FILE *arq;
+FILE *arq = NULL;
 
 void server_init()
 {
@@ -50,103 +50,80 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
         switch (kpckt_recv->type)
         {
         case CD_TYPE:
-            cmd_type = CD_TYPE;
-            if (!chdir((const char *)kpckt_recv->msg)) // "ACK"
-                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
-            else // Erro
-            {
-                error_code = (errno == EACCES ? NO_PERM : NO_DIR);
-
-                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
-                                ERROR_TYPE, &error_code, 1, sizeof(int));
-            }
+            cd_handler(kpckt_recv, kpckt_send);
+            send_kpckt(kpckt_send);
+            seq_send++;
             break;
         case LS_TYPE:
-            cmd_type = LS_TYPE;
-            arq = popen("ls", "r");
-            if (!arq)
+            ls_handler(kpckt_recv, kpckt_send);
+            while (1)
             {
-                fprintf(stderr, "error: popen\n");
-                exit(1);
-            }
-            fgets((char *)buf, MSG_SIZE, arq);
+                send_kpckt(kpckt_send);
 
-            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
-                            buf, 1, strlen((const char *)buf));
+                if (kpckt_send->type == ACK_TYPE)
+                    break;
+                printf("[Server] Send: ");
+                print_kermit_pckt(kpckt_send);
+
+                wait_kpckt(kpckt_recv);
+                printf("[Server] Received: ");
+                print_kermit_pckt(kpckt_recv);
+
+                parity = verify_parity(kpckt_recv);
+                if (!parity)
+                    ls_handler(kpckt_recv, kpckt_send);
+                else
+                {
+                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
+                    seq_send++;
+                }
+            }
             break;
         case VER_TYPE:
-            cmd_type = VER_TYPE;
             if (!access((const char *)kpckt_recv->msg, R_OK))
             {
-                byte_t cmd_cat[BUF_SIZE] = "cat -n ";
-                memcpy(cmd_cat + strlen((const char *)cmd_cat), kpckt_recv->msg, kpckt_recv->size);
-
-                arq = popen((const char *)cmd_cat, "r");
-                if (!arq)
+                ver_handler(kpckt_recv, kpckt_send);
+                while (1)
                 {
-                    fprintf(stderr, "error: popen\n");
-                    exit(1);
-                }
-                fgets((char *)buf, MSG_SIZE, arq);
+                    send_kpckt(kpckt_send);
+                    if (kpckt_send->type == ACK_TYPE)
+                        break;
+                    printf("[Server] Send: ");
+                    print_kermit_pckt(kpckt_send);
 
-                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
-                                buf, 1, strlen((const char *)buf));
+                    wait_kpckt(kpckt_recv);
+                    printf("[Server] Received: ");
+                    print_kermit_pckt(kpckt_recv);
+
+                    parity = verify_parity(kpckt_recv);
+                    if (!parity)
+                        ver_handler(kpckt_recv, kpckt_send);
+                    else
+                    {
+                        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
+                        seq_send++;
+                    }
+                }
             }
-            else // Erro
+            else
             {
                 error_code = (errno == EACCES ? NO_PERM : NO_ARQ);
 
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
                                 ERROR_TYPE, &error_code, 1, sizeof(int));
+                send_kpckt(kpckt_send);
+                seq_send++;
             }
             break;
-        case ACK_TYPE:
-            switch (cmd_type)
-            {
-            case LS_TYPE:
-                if (!fgets((char *)buf, MSG_SIZE, arq))
-                {
-                    memset(buf, 0, MSG_SIZE + 1);
-                    fclose(arq);
-                    arq = NULL;
-
-                    cmd_type = END_TRANS_TYPE;
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
-                }
-                else
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
-                                    buf, 1, strlen((const char *)buf));
-                break;
-            case VER_TYPE:
-                if (!fgets((char *)buf, MSG_SIZE, arq))
-                {
-                    memset(buf, 0, MSG_SIZE + 1);
-                    fclose(arq);
-                    arq = NULL;
-
-                    cmd_type = END_TRANS_TYPE;
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
-                }
-                else
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
-                                    buf, 1, strlen((const char *)buf));
-                break;
-            case END_TRANS_TYPE:
-                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
-            default:
-                break;
-            }
-            break;
-        default:
+        case NACK_TYPE:
+            send_kpckt(kpckt_send);
             break;
         }
-
-        if (type != NACK_TYPE)
-            seq_send++;
     }
     else
     {
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
+        send_kpckt(kpckt_send);
         seq_send++;
     }
 }
@@ -178,4 +155,107 @@ int valid_kermit_pckt_for_server(kermit_pckt_t *kpckt)
 void server_close()
 {
     close(socket_fd);
+}
+
+void cd_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
+{
+    if (!chdir((const char *)kpckt_recv->msg))
+        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
+    else
+    {
+        error_code = (errno == EACCES ? NO_PERM : NO_DIR);
+
+        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
+                        ERROR_TYPE, &error_code, 1, sizeof(int));
+    }
+}
+
+void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
+{
+    if (kpckt_recv->type == ACK_TYPE && kpckt_send->type == END_TRANS_TYPE)
+        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
+    else
+    {
+        switch (kpckt_recv->type)
+        {
+        case LS_TYPE:
+            arq = popen("ls", "r");
+            if (!arq)
+            {
+                fprintf(stderr, "error: popen\n");
+                exit(1);
+            }
+            fgets((char *)buf, MSG_SIZE + 1, arq);
+
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
+                            buf, 1, strlen((const char *)buf));
+            break;
+        case ACK_TYPE:
+            if (!fgets((char *)buf, MSG_SIZE + 1, arq))
+            {
+                memset(buf, 0, MSG_SIZE + 1);
+                fclose(arq);
+                arq = NULL;
+
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+            }
+            else
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
+                                buf, 1, strlen((const char *)buf));
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (kpckt_recv->type != NACK_TYPE)
+        seq_send++;
+}
+
+void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
+{
+    byte_t cmd_cat[BUF_SIZE];
+
+    if (kpckt_recv->type == ACK_TYPE && kpckt_send->type == END_TRANS_TYPE)
+        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
+    else
+    {
+        switch (kpckt_recv->type)
+        {
+        case VER_TYPE:
+            memset(cmd_cat, 0, BUF_SIZE);
+            strcpy((char *)cmd_cat, "cat -n ");
+            memcpy(cmd_cat + strlen((const char *)cmd_cat), kpckt_recv->msg, kpckt_recv->size);
+
+            arq = popen((const char *)cmd_cat, "r");
+            if (!arq)
+            {
+                fprintf(stderr, "error: popen\n");
+                exit(1);
+            }
+            fgets((char *)buf, MSG_SIZE + 1, arq);
+
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                            buf, 1, strlen((const char *)buf));
+            break;
+        case ACK_TYPE:
+            if (!fgets((char *)buf, MSG_SIZE + 1, arq))
+            {
+                memset(buf, 0, MSG_SIZE + 1);
+                fclose(arq);
+                arq = NULL;
+
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+            }
+            else
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                                buf, 1, strlen((const char *)buf));
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (kpckt_recv->type != NACK_TYPE)
+        seq_send++;
 }

@@ -7,7 +7,7 @@ int socket_fd;
 
 // --- Variáveis de controle ---
 int cmd_type;              // Tipo do comando
-void *cmd_args;            // Argumentos do comando
+void **cmd_args;            // Argumentos do comando
 unsigned int seq_recv = 0; // Sequencialização
 int seq_send = -1;
 
@@ -55,16 +55,19 @@ int read_client_command()
     return -1;
 }
 
-void *read_client_args()
+void **read_client_args()
 {
-    void *args = NULL;
+    void **args = NULL;
     switch (cmd_type)
     {
     case CD_TYPE:
     case LCD_TYPE:
     case VER_TYPE:
-        args = malloc(BUF_SIZE);
-        scanf("%s", (byte_t *)args);
+        args = malloc(sizeof(void *));
+        args[0] = malloc(BUF_SIZE);
+
+        scanf("%s", (byte_t *)args[0]);
+
         while (getchar() != '\n'); // Limpa stdin
         break;
     default:
@@ -114,13 +117,15 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt)
     {
     case CD_TYPE:
     case VER_TYPE:
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args, 1,
-                        strlen((const char *)cmd_args));
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
+                        strlen((const char *)cmd_args[0]));
+        free(cmd_args[0]);
+        cmd_args[0] = NULL;
         free(cmd_args);
         cmd_args = NULL;
         break;
     case LS_TYPE:
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args, 0, 0);
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, NULL, 0, 0);
         break;
     default:
         break;
@@ -179,7 +184,11 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     if (!parity)
     {
         if (kpckt_recv->type == ACK_TYPE)
+        {
+            if(cmd_type == VER_TYPE)
+                printf("\n");
             return 0;
+        }
         else if (kpckt_recv->type == ERROR_TYPE)
         {
             int *value = (int *)kpckt_recv->msg;

@@ -44,4 +44,19 @@ int valid_kermit_pckt_for_server(kermit_pckt_t *kpckt);
 */
 void server_close();
 
+/*!
+    @brief  Rotina para o tratamento de pacotes kermit do comando "cd"
+*/
+void cd_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
+/*!
+    @brief  Rotina para o tratamento de pacotes kermit do comando "ls"
+*/
+void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
+/*!
+    @brief  Rotina para o tratamento de pacotes kermit do comando "ver"
+*/
+void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
 #endif

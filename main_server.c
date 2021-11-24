@@ -14,7 +14,6 @@ int main()
 
         kpckt_handler(&pckt_recv, &pckt_send);
 
-        send_kpckt(&pckt_send);
         printf("[Server] Send: ");
         print_kermit_pckt(&pckt_send);
     }
