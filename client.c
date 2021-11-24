@@ -6,9 +6,10 @@ socklen_t addr_len;
 int socket_fd;
 
 // --- Variáveis de controle ---
-int cmd_type;                             // Tipo do comando
-void *cmd_args;                           // Argumentos do comando
-unsigned int seq_send = -1, seq_recv = 0; // Sequencialização
+int cmd_type;              // Tipo do comando
+void *cmd_args;            // Argumentos do comando
+unsigned int seq_recv = 0; // Sequencialização
+int seq_send = -1;
 
 void client_init()
 {
