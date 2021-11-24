@@ -48,7 +48,9 @@ int read_client_command()
         return LS_TYPE;
     else if (!strcmp("lls", (const char *)new_cmd))
         return LLS_TYPE;
-
+    else if (!strcmp("ver", (const char *)new_cmd))
+        return VER_TYPE;
+    
     while (getchar() != '\n'); // Limpa stdin
     return -1;
 }
@@ -60,6 +62,7 @@ void *read_client_args()
     {
     case CD_TYPE:
     case LCD_TYPE:
+    case VER_TYPE:
         args = malloc(BUF_SIZE);
         scanf("%s", (byte_t *)args);
         while (getchar() != '\n'); // Limpa stdin
@@ -110,6 +113,7 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt)
     switch (cmd_type)
     {
     case CD_TYPE:
+    case VER_TYPE:
         gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args, 1,
                         strlen((const char *)cmd_args));
         free(cmd_args);
@@ -186,6 +190,9 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 break;
             case NO_DIR:
                 fprintf(stderr, "[Client] error: directory does not exist\n");
+                break;
+            case NO_ARQ:
+                fprintf(stderr, "[Client] error: file does not exist\n");
                 break;
             default:
                 break;

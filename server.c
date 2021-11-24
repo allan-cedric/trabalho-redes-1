@@ -7,10 +7,9 @@ int socket_fd;
 
 // --- Variáveis de controle ---
 unsigned int seq_send = 0, seq_recv = 0;
-void *args;
 int error_code, cmd_type, type;
 byte_t buf[MSG_SIZE + 1];
-FILE *arq = NULL;
+FILE *arq;
 
 void server_init()
 {
@@ -58,20 +57,8 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             {
                 error_code = (errno == EACCES ? NO_PERM : NO_DIR);
 
-                args = malloc(sizeof(int));
-                if (!args)
-                {
-                    perror("memory allocation error");
-                    exit(ERROR_CODE);
-                }
-
-                memcpy(args, &error_code, sizeof(int));
-
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
-                                ERROR_TYPE, args, 1, sizeof(int));
-
-                free(args);
-                args = NULL;
+                                ERROR_TYPE, &error_code, 1, sizeof(int));
             }
             break;
         case LS_TYPE:
@@ -87,6 +74,32 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
                             buf, 1, strlen((const char *)buf));
             break;
+        case VER_TYPE:
+            cmd_type = VER_TYPE;
+            if (!access((const char *)kpckt_recv->msg, R_OK))
+            {
+                byte_t cmd_cat[BUF_SIZE] = "cat -n ";
+                memcpy(cmd_cat + strlen((const char *)cmd_cat), kpckt_recv->msg, kpckt_recv->size);
+
+                arq = popen((const char *)cmd_cat, "r");
+                if (!arq)
+                {
+                    fprintf(stderr, "error: popen\n");
+                    exit(1);
+                }
+                fgets((char *)buf, MSG_SIZE, arq);
+
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                                buf, 1, strlen((const char *)buf));
+            }
+            else // Erro
+            {
+                error_code = (errno == EACCES ? NO_PERM : NO_ARQ);
+
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
+                                ERROR_TYPE, &error_code, 1, sizeof(int));
+            }
+            break;
         case ACK_TYPE:
             switch (cmd_type)
             {
@@ -99,8 +112,23 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
                     cmd_type = END_TRANS_TYPE;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
-                }else
+                }
+                else
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, LS_CONTENT_TYPE,
+                                    buf, 1, strlen((const char *)buf));
+                break;
+            case VER_TYPE:
+                if (!fgets((char *)buf, MSG_SIZE, arq))
+                {
+                    memset(buf, 0, MSG_SIZE + 1);
+                    fclose(arq);
+                    arq = NULL;
+
+                    cmd_type = END_TRANS_TYPE;
+                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+                }
+                else
+                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
                                     buf, 1, strlen((const char *)buf));
                 break;
             case END_TRANS_TYPE:

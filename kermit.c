@@ -16,6 +16,8 @@ void gen_kermit_pckt(kermit_pckt_t *kpckt, int dest_addr, int origin_addr,
     {
     case CD_TYPE:
     case LS_CONTENT_TYPE:
+    case VER_TYPE:
+    case ARQ_CONTENT_TYPE:
     case ERROR_TYPE:
         memcpy(kpckt->msg, args, kpckt->size);
         break;
