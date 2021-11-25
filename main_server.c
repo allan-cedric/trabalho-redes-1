@@ -8,11 +8,11 @@ int main()
 
     while (1)
     {
-        wait_kpckt(&pckt_recv);
+        wait_kpckt_from_client(&pckt_recv);
         printf("[Server] Received: ");
         print_kermit_pckt(&pckt_recv);
 
-        kpckt_handler(&pckt_recv, &pckt_send);
+        server_kpckt_handler(&pckt_recv, &pckt_send);
 
         printf("[Server] Send: ");
         print_kermit_pckt(&pckt_send);

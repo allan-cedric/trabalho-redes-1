@@ -80,13 +80,17 @@ int client_standalone_commands()
 {
     if (cmd_type == LCD_TYPE)
     {
-        if (chdir((const char *)cmd_args))
+        if (chdir((const char *)cmd_args[0]))
         {
             if (errno == EACCES)
                 fprintf(stderr, "error: permission denied\n");
             else
                 fprintf(stderr, "error: directory does not exist\n");
         }
+        free(cmd_args[0]);
+        cmd_args[0] = NULL;
+        free(cmd_args);
+        cmd_args = NULL;
         return 1;
     }
     else if (cmd_type == LLS_TYPE)

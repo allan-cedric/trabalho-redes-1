@@ -7,7 +7,6 @@ int socket_fd;
 
 // --- Variáveis de controle ---
 unsigned int seq_send = 0, seq_recv = 0;
-int error_code, cmd_type, type;
 byte_t buf[MSG_SIZE + 1];
 FILE *arq = NULL;
 
@@ -23,13 +22,14 @@ void server_init()
     printf("Server initialized successfully!\n");
 }
 
-void wait_kpckt(kermit_pckt_t *kpckt)
+void wait_kpckt_from_client(kermit_pckt_t *kpckt)
 {
     while (1)
     {
-        if (recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, &addr_len) > 0)
+        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, &addr_len);
+        if (ret > 0)
         {
-            if (valid_kermit_pckt_for_server(kpckt))
+            if (valid_kpckt_for_server(kpckt))
             {
                 if (kpckt->seq == seq_recv)
                 {
@@ -41,7 +41,28 @@ void wait_kpckt(kermit_pckt_t *kpckt)
     }
 }
 
-void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
+int recv_kpckt_from_client(kermit_pckt_t *kpckt)
+{
+    double send_time = timestamp();
+    while ((timestamp() - send_time) < TIMEOUT)
+    {
+        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, &addr_len);
+        if (ret > 0)
+        {
+            if (valid_kpckt_for_server(kpckt))
+            {
+                if (kpckt->seq == seq_recv)
+                {
+                    seq_recv = (kpckt->seq + 1) % MAX_SEQ;
+                    return 0;
+                }
+            }
+        }
+    }
+    return 1;
+}
+
+void server_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 {
     byte_t parity = verify_parity(kpckt_recv);
 
@@ -51,21 +72,27 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
         {
         case CD_TYPE:
             cd_handler(kpckt_recv, kpckt_send);
-            send_kpckt(kpckt_send);
-            seq_send++;
+            send_kpckt_to_client(kpckt_send);
             break;
         case LS_TYPE:
             ls_handler(kpckt_recv, kpckt_send);
             while (1)
             {
-                send_kpckt(kpckt_send);
+                send_kpckt_to_client(kpckt_send);
 
                 if (kpckt_send->type == ACK_TYPE)
                     break;
+
                 printf("[Server] Send: ");
                 print_kermit_pckt(kpckt_send);
 
-                wait_kpckt(kpckt_recv);
+                int is_timeout = recv_kpckt_from_client(kpckt_recv);
+                if (is_timeout)
+                {
+                    fprintf(stderr, "[Server] timeout: sending back...\n");
+                    continue;
+                }
+
                 printf("[Server] Received: ");
                 print_kermit_pckt(kpckt_recv);
 
@@ -85,13 +112,21 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 ver_handler(kpckt_recv, kpckt_send);
                 while (1)
                 {
-                    send_kpckt(kpckt_send);
+                    send_kpckt_to_client(kpckt_send);
+                    
                     if (kpckt_send->type == ACK_TYPE)
                         break;
+
                     printf("[Server] Send: ");
                     print_kermit_pckt(kpckt_send);
 
-                    wait_kpckt(kpckt_recv);
+                    int is_timeout = recv_kpckt_from_client(kpckt_recv);
+                    if (is_timeout)
+                    {
+                        fprintf(stderr, "[Server] timeout: sending back...\n");
+                        continue;
+                    }
+
                     printf("[Server] Received: ");
                     print_kermit_pckt(kpckt_recv);
 
@@ -107,28 +142,28 @@ void kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             }
             else
             {
-                error_code = (errno == EACCES ? NO_PERM : NO_ARQ);
+                int error_code = (errno == EACCES ? NO_PERM : NO_ARQ);
 
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
                                 ERROR_TYPE, &error_code, 1, sizeof(int));
-                send_kpckt(kpckt_send);
+                send_kpckt_to_client(kpckt_send);
                 seq_send++;
             }
             break;
         case NACK_TYPE:
-            send_kpckt(kpckt_send);
+            send_kpckt_to_client(kpckt_send);
             break;
         }
     }
     else
     {
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
-        send_kpckt(kpckt_send);
+        send_kpckt_to_client(kpckt_send);
         seq_send++;
     }
 }
 
-void send_kpckt(kermit_pckt_t *kpckt)
+void send_kpckt_to_client(kermit_pckt_t *kpckt)
 {
     int ret = sendto_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, addr_len);
     if (ret < 0)
@@ -145,7 +180,7 @@ void send_kpckt(kermit_pckt_t *kpckt)
     }
 }
 
-int valid_kermit_pckt_for_server(kermit_pckt_t *kpckt)
+int valid_kpckt_for_server(kermit_pckt_t *kpckt)
 {
     if (valid_kermit_pckt(kpckt))
         return (kpckt->origin_addr == CLI_ADDR && kpckt->dest_addr == SER_ADDR);
@@ -163,11 +198,12 @@ void cd_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
     else
     {
-        error_code = (errno == EACCES ? NO_PERM : NO_DIR);
+        int error_code = (errno == EACCES ? NO_PERM : NO_DIR);
 
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
                         ERROR_TYPE, &error_code, 1, sizeof(int));
     }
+    seq_send++;
 }
 
 void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
