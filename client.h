@@ -23,9 +23,9 @@ int read_client_command();
 /*!
     @brief  Lê os argumentos de um comando
 
-    @return Vetor com os argumentos lidos
+    @return 0 se foram lidos com sucesso, senão -1
 */
-void **read_client_args();
+int read_client_args();
 
 /*!
     @brief  Verifica e executa comandos standalone do cliente

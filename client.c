@@ -6,10 +6,16 @@ socklen_t addr_len;
 int socket_fd;
 
 // --- Variáveis de controle ---
+int is_from_nack = 0;
 int cmd_type;              // Tipo do comando
-void **cmd_args;            // Argumentos do comando
+void **cmd_args;           // Argumentos do comando
 unsigned int seq_recv = 0; // Sequencialização
 int seq_send = -1;
+
+void clean_stdin()
+{
+    while (getchar() != '\n');
+}
 
 void client_init()
 {
@@ -26,13 +32,19 @@ void client_init()
 
 void read_client_input()
 {
-    printf("[Client] > ");
-    while ((cmd_type = read_client_command()) < 0)
+    while (1)
     {
-        fprintf(stderr, "error: command not found\n");
         printf("[Client] > ");
+        if ((cmd_type = read_client_command()) < 0)
+        {
+            fprintf(stderr, "error: command not found\n");
+            continue;
+        }
+        if (read_client_args())
+            fprintf(stderr, "error: bad arguments\n");
+        else
+            break;
     }
-    cmd_args = read_client_args();
 }
 
 int read_client_command()
@@ -50,30 +62,90 @@ int read_client_command()
         return LLS_TYPE;
     else if (!strcmp("ver", (const char *)new_cmd))
         return VER_TYPE;
-    
-    while (getchar() != '\n'); // Limpa stdin
+    else if (!strcmp("linha", (const char *)new_cmd))
+        return LINHA_TYPE;
+    else if (!strcmp("linhas", (const char *)new_cmd))
+        return LINHAS_TYPE;
+
+    clean_stdin();
+
     return -1;
 }
 
-void **read_client_args()
+int read_client_args()
 {
-    void **args = NULL;
+    int ret;
+    cmd_args = NULL;
     switch (cmd_type)
     {
     case CD_TYPE:
     case LCD_TYPE:
     case VER_TYPE:
-        args = malloc(sizeof(void *));
-        args[0] = malloc(BUF_SIZE);
+        cmd_args = malloc(sizeof(void *));
+        cmd_args[0] = malloc(BUF_SIZE);
 
-        scanf("%s", (byte_t *)args[0]);
+        ret = scanf("%s", (byte_t *)cmd_args[0]);
+        clean_stdin();
+        if (ret < 1)
+        {
+            free(cmd_args[0]);
+            cmd_args[0] = NULL;
 
-        while (getchar() != '\n'); // Limpa stdin
+            free(cmd_args);
+            cmd_args = NULL;
+
+            return -1;
+        }
+
+        break;
+    case LINHA_TYPE:
+        cmd_args = malloc(sizeof(void *) * 2);
+        cmd_args[0] = malloc(BUF_SIZE);
+        cmd_args[1] = malloc(sizeof(int));
+
+        ret = scanf("%i %s", (int *)cmd_args[1], (byte_t *)cmd_args[0]);
+        clean_stdin();
+        if (ret < 2)
+        {
+            free(cmd_args[0]);
+            cmd_args[0] = NULL;
+
+            free(cmd_args[1]);
+            cmd_args[1] = NULL;
+
+            free(cmd_args);
+            cmd_args = NULL;
+
+            return -1;
+        }
+
+        break;
+    case LINHAS_TYPE:
+        cmd_args = malloc(sizeof(void *) * 2);
+        cmd_args[0] = malloc(BUF_SIZE);
+        cmd_args[1] = malloc(sizeof(int) * 2);
+
+        ret = scanf("%i %i %s", (int *)cmd_args[1], (int *)(cmd_args[1] + sizeof(int)),
+                    (byte_t *)cmd_args[0]);
+        clean_stdin();
+        if (ret < 3)
+        {
+            free(cmd_args[0]);
+            cmd_args[0] = NULL;
+
+            free(cmd_args[1]);
+            cmd_args[1] = NULL;
+
+            free(cmd_args);
+            cmd_args = NULL;
+
+            return -1;
+        }
         break;
     default:
         break;
     }
-    return args;
+    return 0;
 }
 
 int client_standalone_commands()
@@ -104,7 +176,7 @@ int client_standalone_commands()
             exit(1);
         }
 
-        while (fgets((char *)buf, MSG_SIZE, arq))
+        while (fgets((char *)buf, MSG_SIZE + 1, arq))
             printf("%s", buf);
 
         fclose(arq);
@@ -130,6 +202,13 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt)
         break;
     case LS_TYPE:
         gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, NULL, 0, 0);
+        break;
+    case LINHA_TYPE:
+    case LINHAS_TYPE:
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
+                        strlen((const char *)cmd_args[0]));
+        free(cmd_args[0]);
+        cmd_args[0] = NULL;
         break;
     default:
         break;
@@ -168,6 +247,11 @@ int recv_kpckt_from_server(kermit_pckt_t *kpckt)
                     seq_recv = (kpckt->seq + 1) % MAX_SEQ;
                     return 0;
                 }
+                if (is_from_nack)
+                {
+                    is_from_nack = 0;
+                    return 0;
+                }
             }
         }
     }
@@ -189,8 +273,37 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     {
         if (kpckt_recv->type == ACK_TYPE)
         {
-            if(cmd_type == VER_TYPE)
+            switch (cmd_type)
+            {
+            case LINHA_CONTENT_TYPE:
+            case VER_TYPE:
                 printf("\n");
+                break;
+            case LINHA_TYPE:
+                seq_send++;
+                gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, LINHA_CONTENT_TYPE,
+                                cmd_args[1], 1, sizeof(int));
+                free(cmd_args[1]);
+                cmd_args[1] = NULL;
+                free(cmd_args);
+                cmd_args = NULL;
+
+                cmd_type = LINHA_CONTENT_TYPE;
+                return 1;
+            case LINHAS_TYPE:
+                seq_send++;
+                gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, LINHA_CONTENT_TYPE,
+                                cmd_args[1], 2, sizeof(int));
+                free(cmd_args[1]);
+                cmd_args[1] = NULL;
+                free(cmd_args);
+                cmd_args = NULL;
+
+                cmd_type = LINHA_CONTENT_TYPE;
+                return 1;
+            default:
+                break;
+            }
             return 0;
         }
         else if (kpckt_recv->type == ERROR_TYPE)
@@ -212,9 +325,7 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             }
             return 0;
         }
-        else if (kpckt_recv->type == LINHA_CONTENT_TYPE ||
-                 kpckt_recv->type == LS_CONTENT_TYPE ||
-                 kpckt_recv->type == ARQ_CONTENT_TYPE)
+        else if (kpckt_recv->type == LS_CONTENT_TYPE || kpckt_recv->type == ARQ_CONTENT_TYPE)
         {
             printf("%s", kpckt_recv->msg);
         }
@@ -227,6 +338,7 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     }
     else // Mensagem veio corrompida
     {
+        is_from_nack = 1;
         seq_send++;
         gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
     }
