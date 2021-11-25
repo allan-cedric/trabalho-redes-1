@@ -1,9 +1,10 @@
 #include "raw_socket.h"
 
-int rawsocket_connection(char *device, struct sockaddr_ll *addr)
+int rawsocket_connection(char *device)
 {
   int socket_fd;
   struct ifreq ir;
+  struct sockaddr_ll addr;
   struct packet_mreq mr;
 
   socket_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL)); /*cria socket*/
@@ -21,11 +22,11 @@ int rawsocket_connection(char *device, struct sockaddr_ll *addr)
     exit(ERROR_CODE);
   }
 
-  memset(addr, 0, sizeof(struct sockaddr_ll)); /*IP do dispositivo*/
-  addr->sll_family = AF_PACKET;
-  addr->sll_protocol = htons(ETH_P_ALL);
-  addr->sll_ifindex = ir.ifr_ifindex;
-  if (bind(socket_fd, (struct sockaddr *)addr, sizeof(struct sockaddr_ll)) == -1)
+  memset(&addr, 0, sizeof(struct sockaddr_ll)); /*IP do dispositivo*/
+  addr.sll_family = AF_PACKET;
+  addr.sll_protocol = htons(ETH_P_ALL);
+  addr.sll_ifindex = ir.ifr_ifindex;
+  if (bind(socket_fd, (struct sockaddr *)&addr, sizeof(struct sockaddr_ll)) == -1)
   {
     perror("Error to bind");
     exit(ERROR_CODE);
@@ -46,14 +47,14 @@ int rawsocket_connection(char *device, struct sockaddr_ll *addr)
   return socket_fd;
 }
 
-int sendto_rawsocket(int socket_fd, void *buf, size_t buf_size, struct sockaddr_ll *addr, socklen_t addr_len)
+int sendto_rawsocket(int socket_fd, void *buf, size_t buf_size)
 {
-  return sendto(socket_fd, buf, buf_size, 0, (const struct sockaddr *)addr, addr_len);
+  return send(socket_fd, buf, buf_size, 0);
 }
 
-int recvfrom_rawsocket(int socket_fd, void *buf, size_t buf_size, struct sockaddr_ll *addr, socklen_t *addr_len)
+int recvfrom_rawsocket(int socket_fd, void *buf, size_t buf_size)
 {
-  return recvfrom(socket_fd, buf, buf_size, 0, (struct sockaddr *)addr, addr_len);
+  return recv(socket_fd, buf, buf_size, 0);
 }
 
 double timestamp()

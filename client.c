@@ -1,8 +1,6 @@
 #include "client.h"
 
 // --- Estrutura para conexão raw socket ---
-struct sockaddr_ll addr;
-socklen_t addr_len;
 int socket_fd;
 
 // --- Variáveis de controle ---
@@ -20,10 +18,8 @@ void clean_stdin()
 void client_init()
 {
     printf("Creating a socket...\n");
-    socket_fd = rawsocket_connection("lo", &addr);
+    socket_fd = rawsocket_connection("lo");
     printf("Socket (fd=%i) created successfully!\n\n", socket_fd);
-
-    addr_len = sizeof(addr);
 
     printf("********************************\n");
     printf(" Welcome to the Remote C Editor\n");
@@ -217,7 +213,7 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt)
 
 void send_kpckt_to_server(kermit_pckt_t *kpckt)
 {
-    int ret = sendto_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, addr_len);
+    int ret = sendto_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
     if (ret < 0)
     {
         fprintf(stderr, "error: package not sent to raw socket\n");
@@ -237,7 +233,7 @@ int recv_kpckt_from_server(kermit_pckt_t *kpckt)
     double send_time = timestamp();
     while ((timestamp() - send_time) < TIMEOUT)
     {
-        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, &addr_len);
+        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
         if (ret > 0)
         {
             if (valid_kpckt_for_client(kpckt))

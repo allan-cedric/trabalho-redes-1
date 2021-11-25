@@ -1,8 +1,6 @@
 #include "server.h"
 
 // --- Estrutura para conexão raw socket ---
-struct sockaddr_ll addr;
-socklen_t addr_len;
 int socket_fd;
 
 // --- Variáveis de controle ---
@@ -15,10 +13,8 @@ void server_init()
 {
     printf("Initializing server...\n");
     printf("Creating a socket...\n");
-    socket_fd = rawsocket_connection("lo", &addr);
+    socket_fd = rawsocket_connection("lo");
     printf("Socket (fd=%i) created successfully!\n\n", socket_fd);
-
-    addr_len = sizeof(addr);
 
     printf("Server initialized successfully!\n");
 }
@@ -27,7 +23,7 @@ void wait_kpckt_from_client(kermit_pckt_t *kpckt)
 {
     while (1)
     {
-        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, &addr_len);
+        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
         if (ret > 0)
         {
             if (valid_kpckt_for_server(kpckt))
@@ -52,7 +48,7 @@ int recv_kpckt_from_client(kermit_pckt_t *kpckt)
     double send_time = timestamp();
     while ((timestamp() - send_time) < TIMEOUT)
     {
-        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, &addr_len);
+        int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
         if (ret > 0)
         {
             if (valid_kpckt_for_server(kpckt))
@@ -269,7 +265,7 @@ void server_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
 void send_kpckt_to_client(kermit_pckt_t *kpckt)
 {
-    int ret = sendto_rawsocket(socket_fd, kpckt, sizeof(*kpckt), &addr, addr_len);
+    int ret = sendto_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
     if (ret < 0)
     {
         fprintf(stderr, "error: package not sent to raw socket\n");
