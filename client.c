@@ -13,7 +13,8 @@ unsigned int buf_ptr = 0;
 
 void clean_stdin()
 {
-    while (getchar() != '\n');
+    while (getchar() != '\n')
+        ;
 }
 
 void client_init()
@@ -65,6 +66,8 @@ int read_client_command()
         return LINHAS_TYPE;
     else if (!strcmp("edit", (const char *)new_cmd))
         return EDIT_TYPE;
+    else if (!strcmp("compilar", (const char *)new_cmd))
+        return COMPILAR_TYPE;
 
     clean_stdin();
 
@@ -168,6 +171,41 @@ int read_client_args()
             return -1;
         }
         break;
+    case COMPILAR_TYPE:
+        cmd_args = malloc(sizeof(void *) * 2);
+        cmd_args[0] = malloc(BUF_SIZE);
+        cmd_args[1] = malloc(BUF_SIZE);
+
+        memset(cmd_args[0], 0, BUF_SIZE);
+        memset(cmd_args[1], 0, BUF_SIZE);
+
+        ret = scanf("%[^\n]s", str);
+        if (ret < 1)
+        {
+            free(cmd_args[0]);
+            cmd_args[0] = NULL;
+
+            free(cmd_args[1]);
+            cmd_args[1] = NULL;
+
+            free(cmd_args);
+            cmd_args = NULL;
+
+            return -1;
+        }else
+        {
+            byte_t *last_whitespace = NULL;
+            for(int i = 0; i < strlen((const char *)str); i++)
+            {
+                if(str[i] <= 32)
+                    last_whitespace = str + i;
+            }
+
+            memcpy(cmd_args[0], last_whitespace + 1, strlen((const char *)(last_whitespace + 1)));
+            memcpy(cmd_args[1], str, strlen((const char *)str) - strlen((const char *)last_whitespace));
+        }
+
+        break;
     default:
         break;
     }
@@ -232,6 +270,7 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt)
     case LINHA_TYPE:
     case LINHAS_TYPE:
     case EDIT_TYPE:
+    case COMPILAR_TYPE:
         buf_ptr = 0;
         gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
                         strlen((const char *)cmd_args[0]));
@@ -353,6 +392,27 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
                     free(cmd_args[2]);
                     cmd_args[2] = NULL;
+                    free(cmd_args);
+                    cmd_args = NULL;
+
+                    cmd_type = END_TRANS_TYPE;
+                }
+                return 1;
+                break;
+            case COMPILAR_TYPE:
+                seq_send++;
+                if (buf_ptr < strlen((const char *)cmd_args[1]))
+                {
+                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                                    cmd_args[1] + buf_ptr, 1, strlen((const char *)(cmd_args[1] + buf_ptr)));
+                    buf_ptr += MSG_SIZE;
+                }
+                else
+                {
+                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+
+                    free(cmd_args[1]);
+                    cmd_args[1] = NULL;
                     free(cmd_args);
                     cmd_args = NULL;
 
