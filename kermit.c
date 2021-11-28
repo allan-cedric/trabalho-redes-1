@@ -20,6 +20,7 @@ void gen_kermit_pckt(kermit_pckt_t *kpckt, int dest_addr, int origin_addr,
     case LINHA_TYPE:
     case LINHAS_TYPE:
     case LINHA_CONTENT_TYPE:
+    case EDIT_TYPE:
     case ARQ_CONTENT_TYPE:
     case ERROR_TYPE:
         memcpy(kpckt->msg, args, kpckt->size);

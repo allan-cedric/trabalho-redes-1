@@ -9,6 +9,7 @@ int cmd_type;              // Tipo do comando
 void **cmd_args;           // Argumentos do comando
 unsigned int seq_recv = 0; // Sequencialização
 int seq_send = -1;
+unsigned int buf_ptr = 0;
 
 void clean_stdin()
 {
@@ -62,6 +63,8 @@ int read_client_command()
         return LINHA_TYPE;
     else if (!strcmp("linhas", (const char *)new_cmd))
         return LINHAS_TYPE;
+    else if (!strcmp("edit", (const char *)new_cmd))
+        return EDIT_TYPE;
 
     clean_stdin();
 
@@ -71,6 +74,7 @@ int read_client_command()
 int read_client_args()
 {
     int ret;
+    byte_t str[BUF_SIZE];
     cmd_args = NULL;
     switch (cmd_type)
     {
@@ -131,6 +135,32 @@ int read_client_args()
 
             free(cmd_args[1]);
             cmd_args[1] = NULL;
+
+            free(cmd_args);
+            cmd_args = NULL;
+
+            return -1;
+        }
+        break;
+    case EDIT_TYPE:
+        cmd_args = malloc(sizeof(void *) * 3);
+        cmd_args[0] = malloc(BUF_SIZE);
+        cmd_args[1] = malloc(sizeof(int));
+        cmd_args[2] = malloc(BUF_SIZE);
+
+        ret = scanf("%i %s %[^\n]s", (int *)cmd_args[1], (byte_t *)cmd_args[0], str);
+        memcpy(cmd_args[2], str + sizeof(byte_t), strlen((const char *)str) - 2);
+        clean_stdin();
+        if (ret < 3 || str[0] != '"' || str[strlen((const char *)str) - 1] != '"')
+        {
+            free(cmd_args[0]);
+            cmd_args[0] = NULL;
+
+            free(cmd_args[1]);
+            cmd_args[1] = NULL;
+
+            free(cmd_args[2]);
+            cmd_args[2] = NULL;
 
             free(cmd_args);
             cmd_args = NULL;
@@ -201,6 +231,8 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt)
         break;
     case LINHA_TYPE:
     case LINHAS_TYPE:
+    case EDIT_TYPE:
+        buf_ptr = 0;
         gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
                         strlen((const char *)cmd_args[0]));
         free(cmd_args[0]);
@@ -297,6 +329,37 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
                 cmd_type = LINHA_CONTENT_TYPE;
                 return 1;
+            case EDIT_TYPE:
+                seq_send++;
+                gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, LINHA_TYPE,
+                                cmd_args[1], 1, sizeof(int));
+                free(cmd_args[1]);
+                cmd_args[1] = NULL;
+
+                cmd_type = BUF_TYPE;
+                return 1;
+                break;
+            case BUF_TYPE:
+                seq_send++;
+                if (buf_ptr < strlen((const char *)cmd_args[2]))
+                {
+                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                                    cmd_args[2] + buf_ptr, 1, strlen((const char *)(cmd_args[2] + buf_ptr)));
+                    buf_ptr += MSG_SIZE;
+                }
+                else
+                {
+                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+
+                    free(cmd_args[2]);
+                    cmd_args[2] = NULL;
+                    free(cmd_args);
+                    cmd_args = NULL;
+
+                    cmd_type = END_TRANS_TYPE;
+                }
+                return 1;
+                break;
             default:
                 break;
             }

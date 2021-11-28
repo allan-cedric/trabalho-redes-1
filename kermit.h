@@ -30,6 +30,8 @@
 #define LCD_TYPE (0x10)
 #define LLS_TYPE (0x11)
 
+#define BUF_TYPE (0x12)
+
 // Códigos de resposta
 #define ACK_TYPE (0x8)
 #define NACK_TYPE (0x9)

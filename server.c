@@ -249,6 +249,51 @@ void server_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 seq_send++;
             }
             break;
+        case EDIT_TYPE:
+            if (!access((const char *)kpckt_recv->msg, R_OK))
+            {
+                edit_handler(kpckt_recv, kpckt_send);
+                while (1)
+                {
+                    send_kpckt_to_client(kpckt_send);
+
+                    if (kpckt_send->type == ACK_TYPE && kpckt_recv->type == END_TRANS_TYPE)
+                        break;
+
+                    printf("[Server] Send: ");
+                    print_kermit_pckt(kpckt_send);
+
+                    int is_timeout = recv_kpckt_from_client(kpckt_recv);
+                    if (is_timeout)
+                    {
+                        fprintf(stderr, "[Server] timeout: sending back...\n");
+                        continue;
+                    }
+
+                    printf("[Server] Received: ");
+                    print_kermit_pckt(kpckt_recv);
+
+                    parity = verify_parity(kpckt_recv);
+                    if (!parity)
+                        edit_handler(kpckt_recv, kpckt_send);
+                    else
+                    {
+                        is_from_nack = 1;
+                        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
+                        seq_send++;
+                    }
+                }
+            }
+            else
+            {
+                int error_code = (errno == EACCES ? NO_PERM : NO_ARQ);
+
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send,
+                                ERROR_TYPE, &error_code, 1, sizeof(int));
+                send_kpckt_to_client(kpckt_send);
+                seq_send++;
+            }
+            break;
         case NACK_TYPE:
             send_kpckt_to_client(kpckt_send);
             break;
@@ -480,7 +525,7 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 fprintf(stderr, "error: popen\n");
                 exit(1);
             }
-            
+
             fgets((char *)buf, MSG_SIZE + 1, arq);
 
             gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
@@ -499,6 +544,55 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             else
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
                                 buf, 1, strlen((const char *)buf));
+            break;
+        default:
+            break;
+        }
+    }
+    if (kpckt_recv->type != NACK_TYPE)
+        seq_send++;
+}
+
+void edit_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
+{
+    static byte_t buf_arq[BUF_SIZE];
+    static int line;
+    static byte_t buf_line[BUF_SIZE];
+
+    if (kpckt_recv->type == END_TRANS_TYPE)
+    {
+        byte_t cmd_sed[BUF_SIZE * 3];
+        memset(cmd_sed, 0, BUF_SIZE * 3);
+
+        sprintf((char *)cmd_sed, "sed -i '%is/.*/%s/' %s", line, buf_line, buf_arq);
+
+        arq = popen((const char *)cmd_sed, "r");
+        if (!arq)
+        {
+            fprintf(stderr, "error: popen\n");
+            exit(1);
+        }
+        fclose(arq);
+
+        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
+    }
+    else
+    {
+        switch (kpckt_recv->type)
+        {
+        case EDIT_TYPE:
+            memset(buf_arq, 0, BUF_SIZE);
+            memset(buf_line, 0, BUF_SIZE);
+            memcpy(buf_arq, kpckt_recv->msg, kpckt_recv->size);
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
+            break;
+        case LINHA_TYPE:
+            memcpy(&line, kpckt_recv->msg, kpckt_recv->size);
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
+            break;
+        case ARQ_CONTENT_TYPE:
+            memcpy(buf_line + strlen((const char *)buf_line), kpckt_recv->msg, kpckt_recv->size);
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
             break;
         default:
             break;

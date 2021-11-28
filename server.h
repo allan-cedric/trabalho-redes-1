@@ -93,4 +93,12 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 */
 void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
+/*!
+    @brief  Rotina para o tratamento de pacotes kermit do comando "edit"
+
+    @param kpckt_recv Pacote a ser tratado
+    @param kpckt_send Pacote de resposta
+*/
+void edit_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
 #endif
