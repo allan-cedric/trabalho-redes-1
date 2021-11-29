@@ -1,3 +1,5 @@
+// Allan Cedric G. B. Alves da Silva - GRR20190351
+
 #include "raw_socket.h"
 
 int rawsocket_connection(char *device)
@@ -41,7 +43,7 @@ int rawsocket_connection(char *device)
     exit(ERROR_CODE);
   }
 
-  // Seta sendto e recvfrom como não bloqueantes (timeout)
+  // Seta procedimentos send e recv como não bloqueantes (auxilia para timeout)
   fcntl(socket_fd, F_SETFL, O_NONBLOCK);
 
   return socket_fd;
