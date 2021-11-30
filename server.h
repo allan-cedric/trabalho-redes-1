@@ -1,3 +1,5 @@
+// Allan Cedric G. B. Alves da Silva - GRR20190351
+
 #ifndef __SERVER_H__
 #define __SERVER_H__
 
@@ -52,6 +54,18 @@ int valid_kpckt_for_server(kermit_pckt_t *kpckt);
     @brief Finaliza a conexão raw socket do servidor
 */
 void server_close();
+
+void ls_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
+void ver_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
+void linha_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
+void linhas_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
+void edit_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
+
+void compilar_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
 /*!
     @brief  Rotina para o tratamento de pacotes kermit do comando "cd"

@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall
 
-LIB_OBJS = kermit.o raw_socket.o 
+LIB_OBJS = kermit.o raw_socket.o utils.o
 
 LIB_OBJS_CLI = client.o
 LIB_OBJS_SER = server.o

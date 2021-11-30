@@ -1,20 +1,20 @@
+// Allan Cedric G. B. Alves da Silva - GRR20190351
+
 #include "client.h"
 
-// --- Estrutura para conexão raw socket ---
+// Descritor de arquivo do raw socket
 int socket_fd;
 
 // --- Variáveis de controle ---
-int is_from_nack = 0;
-int cmd_type;              // Tipo do comando
-void **cmd_args;           // Argumentos do comando
+int is_from_nack = 0;      // Flag que indica se foi enviado um NACK
+void **cmd_args;           // Argumentos de um comando
 unsigned int seq_recv = 0; // Sequencialização
 int seq_send = -1;
-unsigned int buf_ptr = 0;
+unsigned int buf_ptr = 0; // Ponteiro auxiliar para varrer dados de um buffer
 
 void clean_stdin()
 {
-    while (getchar() != '\n')
-        ;
+    while (getchar() != '\n');
 }
 
 void client_init()
@@ -28,26 +28,27 @@ void client_init()
     printf("********************************\n\n");
 }
 
-void read_client_input()
+int read_client_input()
 {
+    int cmd_type;
     while (1)
     {
         printf("[Client] > ");
         if ((cmd_type = read_client_command()) < 0)
-        {
             fprintf(stderr, "error: command not found\n");
-            continue;
-        }
-        if (read_client_args())
+        else if (read_client_args(cmd_type))
             fprintf(stderr, "error: bad arguments\n");
         else
             break;
     }
+    return cmd_type;
 }
 
 int read_client_command()
 {
     byte_t new_cmd[BUF_SIZE];
+    memset(new_cmd, 0, BUF_SIZE);
+
     scanf("%s", new_cmd);
 
     if (!strcmp("cd", (const char *)new_cmd))
@@ -74,145 +75,182 @@ int read_client_command()
     return -1;
 }
 
-int read_client_args()
+int read_client_args(int cmd_type)
 {
-    int ret;
-    byte_t str[BUF_SIZE];
+    int ret;              // Valores de retorno do scanf
+    byte_t str[BUF_SIZE]; // String auxiliar para leitura de argumentos
+    memset(str, 0, BUF_SIZE);
+
     cmd_args = NULL;
     switch (cmd_type)
     {
-    case CD_TYPE:
-    case LCD_TYPE:
-    case VER_TYPE:
-        cmd_args = malloc(sizeof(void *));
-        cmd_args[0] = malloc(BUF_SIZE);
+        case CD_TYPE:
+        case LCD_TYPE:
+        case VER_TYPE:
+            cmd_args = malloc(sizeof(void *));
+            allocation_test(cmd_args);
 
-        ret = scanf("%s", (byte_t *)cmd_args[0]);
-        clean_stdin();
-        if (ret < 1)
-        {
-            free(cmd_args[0]);
-            cmd_args[0] = NULL;
+            cmd_args[0] = malloc(BUF_SIZE); // Nome do diretório/arquivo
+            allocation_test(cmd_args[0]);
 
-            free(cmd_args);
-            cmd_args = NULL;
+            memset(cmd_args[0], 0, BUF_SIZE);
 
-            return -1;
-        }
-
-        break;
-    case LINHA_TYPE:
-        cmd_args = malloc(sizeof(void *) * 2);
-        cmd_args[0] = malloc(BUF_SIZE);
-        cmd_args[1] = malloc(sizeof(int));
-
-        ret = scanf("%i %s", (int *)cmd_args[1], (byte_t *)cmd_args[0]);
-        clean_stdin();
-        if (ret < 2)
-        {
-            free(cmd_args[0]);
-            cmd_args[0] = NULL;
-
-            free(cmd_args[1]);
-            cmd_args[1] = NULL;
-
-            free(cmd_args);
-            cmd_args = NULL;
-
-            return -1;
-        }
-
-        break;
-    case LINHAS_TYPE:
-        cmd_args = malloc(sizeof(void *) * 2);
-        cmd_args[0] = malloc(BUF_SIZE);
-        cmd_args[1] = malloc(sizeof(int) * 2);
-
-        ret = scanf("%i %i %s", (int *)cmd_args[1], (int *)(cmd_args[1] + sizeof(int)),
-                    (byte_t *)cmd_args[0]);
-        clean_stdin();
-        if (ret < 3)
-        {
-            free(cmd_args[0]);
-            cmd_args[0] = NULL;
-
-            free(cmd_args[1]);
-            cmd_args[1] = NULL;
-
-            free(cmd_args);
-            cmd_args = NULL;
-
-            return -1;
-        }
-        break;
-    case EDIT_TYPE:
-        cmd_args = malloc(sizeof(void *) * 3);
-        cmd_args[0] = malloc(BUF_SIZE);
-        cmd_args[1] = malloc(sizeof(int));
-        cmd_args[2] = malloc(BUF_SIZE);
-
-        ret = scanf("%i %s %[^\n]s", (int *)cmd_args[1], (byte_t *)cmd_args[0], str);
-        memcpy(cmd_args[2], str + sizeof(byte_t), strlen((const char *)str) - 2);
-        clean_stdin();
-        if (ret < 3 || str[0] != '"' || str[strlen((const char *)str) - 1] != '"')
-        {
-            free(cmd_args[0]);
-            cmd_args[0] = NULL;
-
-            free(cmd_args[1]);
-            cmd_args[1] = NULL;
-
-            free(cmd_args[2]);
-            cmd_args[2] = NULL;
-
-            free(cmd_args);
-            cmd_args = NULL;
-
-            return -1;
-        }
-        break;
-    case COMPILAR_TYPE:
-        cmd_args = malloc(sizeof(void *) * 2);
-        cmd_args[0] = malloc(BUF_SIZE);
-        cmd_args[1] = malloc(BUF_SIZE);
-
-        memset(cmd_args[0], 0, BUF_SIZE);
-        memset(cmd_args[1], 0, BUF_SIZE);
-
-        ret = scanf("%[^\n]s", str);
-        if (ret < 1)
-        {
-            free(cmd_args[0]);
-            cmd_args[0] = NULL;
-
-            free(cmd_args[1]);
-            cmd_args[1] = NULL;
-
-            free(cmd_args);
-            cmd_args = NULL;
-
-            return -1;
-        }else
-        {
-            byte_t *last_whitespace = NULL;
-            for(int i = 0; i < strlen((const char *)str); i++)
+            ret = scanf("%s", (byte_t *)cmd_args[0]);
+            clean_stdin();
+            if (ret != 1)
             {
-                if(str[i] <= 32)
-                    last_whitespace = str + i;
+                free(cmd_args[0]);
+                cmd_args[0] = NULL;
+
+                free(cmd_args);
+                cmd_args = NULL;
+
+                return -1;
             }
+            break;
+        case LINHA_TYPE:
+            cmd_args = malloc(sizeof(void *) * 2);
+            allocation_test(cmd_args);
 
-            memcpy(cmd_args[0], last_whitespace + 1, strlen((const char *)(last_whitespace + 1)));
-            memcpy(cmd_args[1], str, strlen((const char *)str) - strlen((const char *)last_whitespace));
-        }
+            cmd_args[0] = malloc(BUF_SIZE);    // Nome do arquivo
+            allocation_test(cmd_args[0]);
 
-        break;
-    default:
-        break;
+            cmd_args[1] = malloc(sizeof(int)); // Número da linha
+            allocation_test(cmd_args[1]);
+
+            memset(cmd_args[0], 0, BUF_SIZE);
+            memset(cmd_args[1], 0, sizeof(int));
+
+            ret = scanf("%i %s", (int *)cmd_args[1], (byte_t *)cmd_args[0]);
+            clean_stdin();
+            if (ret != 2)
+            {
+                free(cmd_args[0]);
+                cmd_args[0] = NULL;
+
+                free(cmd_args[1]);
+                cmd_args[1] = NULL;
+
+                free(cmd_args);
+                cmd_args = NULL;
+
+                return -1;
+            }
+            break;
+        case LINHAS_TYPE:
+            cmd_args = malloc(sizeof(void *) * 2);
+            allocation_test(cmd_args);
+
+            cmd_args[0] = malloc(BUF_SIZE);        // Nome do arquivo
+            allocation_test(cmd_args[0]);
+
+            cmd_args[1] = malloc(sizeof(int) * 2); // Número da linha inicial e da linha final
+            allocation_test(cmd_args[1]);
+
+            memset(cmd_args[0], 0, BUF_SIZE);
+            memset(cmd_args[1], 0, sizeof(int) * 2);
+
+            ret = scanf("%i %i %s", (int *)cmd_args[1],
+                        (int *)(cmd_args[1] + sizeof(int)), (byte_t *)cmd_args[0]);
+            clean_stdin();
+            if (ret != 3)
+            {
+                free(cmd_args[0]);
+                cmd_args[0] = NULL;
+
+                free(cmd_args[1]);
+                cmd_args[1] = NULL;
+
+                free(cmd_args);
+                cmd_args = NULL;
+
+                return -1;
+            }
+            break;
+        case EDIT_TYPE:
+            cmd_args = malloc(sizeof(void *) * 3);
+            allocation_test(cmd_args);
+
+            cmd_args[0] = malloc(BUF_SIZE);    // Nome do arquivo
+            allocation_test(cmd_args[0]);
+
+            cmd_args[1] = malloc(sizeof(int)); // Número da linha
+            allocation_test(cmd_args[1]);
+
+            cmd_args[2] = malloc(BUF_SIZE);    // Conteúdo textual
+            allocation_test(cmd_args[2]);
+
+            memset(cmd_args[0], 0, BUF_SIZE);
+            memset(cmd_args[1], 0, sizeof(int));
+            memset(cmd_args[2], 0, BUF_SIZE);
+
+            ret = scanf("%i %s %[^\n]s", (int *)cmd_args[1], (byte_t *)cmd_args[0], str);
+            memcpy(cmd_args[2], str + sizeof(byte_t), strlen((const char *)str) - 2);
+            clean_stdin();
+            if (ret != 3 || str[0] != '"' || str[strlen((const char *)str) - 1] != '"')
+            {
+                free(cmd_args[0]);
+                cmd_args[0] = NULL;
+
+                free(cmd_args[1]);
+                cmd_args[1] = NULL;
+
+                free(cmd_args[2]);
+                cmd_args[2] = NULL;
+
+                free(cmd_args);
+                cmd_args = NULL;
+
+                return -1;
+            }
+            break;
+        case COMPILAR_TYPE:
+            cmd_args = malloc(sizeof(void *) * 2);
+            allocation_test(cmd_args);
+
+            cmd_args[0] = malloc(BUF_SIZE); // Nome do arquivo
+            allocation_test(cmd_args[0]);
+
+            cmd_args[1] = malloc(BUF_SIZE); // Opções/Flags
+            allocation_test(cmd_args[1]);
+
+            memset(cmd_args[0], 0, BUF_SIZE);
+            memset(cmd_args[1], 0, BUF_SIZE);
+
+            ret = scanf("%[^\n]s", str);
+            if (ret != 1)
+            {
+                free(cmd_args[0]);
+                cmd_args[0] = NULL;
+
+                free(cmd_args[1]);
+                cmd_args[1] = NULL;
+
+                free(cmd_args);
+                cmd_args = NULL;
+
+                return -1;
+            }
+            else
+            {
+                byte_t *last_whitespace = NULL;
+                for (int i = 0; i < strlen((const char *)str); i++)
+                {
+                    if (str[i] <= ' ')
+                        last_whitespace = str + i;
+                }
+
+                memcpy(cmd_args[0], last_whitespace + 1, strlen((const char *)(last_whitespace + 1)));
+                memcpy(cmd_args[1], str, strlen((const char *)str) - strlen((const char *)last_whitespace));
+            }
+            break;
+        default:
+            break;
     }
     return 0;
 }
 
-int client_standalone_commands()
+int client_standalone_commands(int cmd_type)
 {
     if (cmd_type == LCD_TYPE)
     {
@@ -231,7 +269,8 @@ int client_standalone_commands()
     }
     else if (cmd_type == LLS_TYPE)
     {
-        byte_t buf[MSG_SIZE + 1];
+        byte_t buf[DATA_SIZE + 1];
+        memset(buf, 0, DATA_SIZE + 1);
 
         FILE *arq = popen("ls", "r");
         if (!arq)
@@ -240,7 +279,7 @@ int client_standalone_commands()
             exit(1);
         }
 
-        while (fgets((char *)buf, MSG_SIZE + 1, arq))
+        while (fgets((char *)buf, DATA_SIZE + 1, arq))
             printf("%s", buf);
 
         fclose(arq);
@@ -250,35 +289,35 @@ int client_standalone_commands()
     return 0;
 }
 
-void client_command_kermit_pckt(kermit_pckt_t *kpckt)
+void client_command_kermit_pckt(kermit_pckt_t *kpckt, int cmd_type)
 {
     seq_send++;
     switch (cmd_type)
     {
-    case CD_TYPE:
-    case VER_TYPE:
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
-                        strlen((const char *)cmd_args[0]));
-        free(cmd_args[0]);
-        cmd_args[0] = NULL;
-        free(cmd_args);
-        cmd_args = NULL;
-        break;
-    case LS_TYPE:
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, NULL, 0, 0);
-        break;
-    case LINHA_TYPE:
-    case LINHAS_TYPE:
-    case EDIT_TYPE:
-    case COMPILAR_TYPE:
-        buf_ptr = 0;
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
-                        strlen((const char *)cmd_args[0]));
-        free(cmd_args[0]);
-        cmd_args[0] = NULL;
-        break;
-    default:
-        break;
+        case CD_TYPE:
+        case VER_TYPE:
+            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
+                            strlen((const char *)cmd_args[0]));
+            free(cmd_args[0]);
+            cmd_args[0] = NULL;
+            free(cmd_args);
+            cmd_args = NULL;
+            break;
+        case LS_TYPE:
+            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, NULL, 0, 0);
+            break;
+        case LINHA_TYPE:
+        case LINHAS_TYPE:
+        case EDIT_TYPE:
+        case COMPILAR_TYPE:
+            buf_ptr = 0;
+            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
+                            strlen((const char *)cmd_args[0]));
+            free(cmd_args[0]);
+            cmd_args[0] = NULL;
+            break;
+        default:
+            break;
     }
 }
 
@@ -311,7 +350,7 @@ int recv_kpckt_from_server(kermit_pckt_t *kpckt)
             {
                 if (kpckt->seq == seq_recv) // Evita mensagens duplicadas em sequência
                 {
-                    seq_recv = (kpckt->seq + 1) % MAX_SEQ;
+                    seq_recv = (kpckt->seq + 1) % NUM_SEQ;
                     return 0;
                 }
                 if (is_from_nack)
@@ -332,124 +371,65 @@ int valid_kpckt_for_client(kermit_pckt_t *kpckt)
     return 0;
 }
 
-int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
+int client_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send, int *event_type)
 {
-    byte_t parity = verify_parity(kpckt_recv);
+    byte_t parity = error_detection(kpckt_recv);
 
     if (!parity)
     {
         if (kpckt_recv->type == ACK_TYPE)
         {
-            switch (cmd_type)
+            switch (*event_type)
             {
-            case LINHA_CONTENT_TYPE:
-            case VER_TYPE:
-                printf("\n");
-                break;
-            case LINHA_TYPE:
-                seq_send++;
-                gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, LINHA_CONTENT_TYPE,
-                                cmd_args[1], 1, sizeof(int));
-                free(cmd_args[1]);
-                cmd_args[1] = NULL;
-                free(cmd_args);
-                cmd_args = NULL;
-
-                cmd_type = LINHA_CONTENT_TYPE;
-                return 1;
-            case LINHAS_TYPE:
-                seq_send++;
-                gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, LINHA_CONTENT_TYPE,
-                                cmd_args[1], 2, sizeof(int));
-                free(cmd_args[1]);
-                cmd_args[1] = NULL;
-                free(cmd_args);
-                cmd_args = NULL;
-
-                cmd_type = LINHA_CONTENT_TYPE;
-                return 1;
-            case EDIT_TYPE:
-                seq_send++;
-                gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, LINHA_TYPE,
-                                cmd_args[1], 1, sizeof(int));
-                free(cmd_args[1]);
-                cmd_args[1] = NULL;
-
-                cmd_type = BUF_TYPE;
-                return 1;
-                break;
-            case BUF_TYPE:
-                seq_send++;
-                if (buf_ptr < strlen((const char *)cmd_args[2]))
-                {
-                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
-                                    cmd_args[2] + buf_ptr, 1, strlen((const char *)(cmd_args[2] + buf_ptr)));
-                    buf_ptr += MSG_SIZE;
-                }
-                else
-                {
-                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
-
-                    free(cmd_args[2]);
-                    cmd_args[2] = NULL;
-                    free(cmd_args);
-                    cmd_args = NULL;
-
-                    cmd_type = END_TRANS_TYPE;
-                }
-                return 1;
-                break;
-            case COMPILAR_TYPE:
-                seq_send++;
-                if (buf_ptr < strlen((const char *)cmd_args[1]))
-                {
-                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
-                                    cmd_args[1] + buf_ptr, 1, strlen((const char *)(cmd_args[1] + buf_ptr)));
-                    buf_ptr += MSG_SIZE;
-                }
-                else
-                {
-                    gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
-
-                    free(cmd_args[1]);
-                    cmd_args[1] = NULL;
-                    free(cmd_args);
-                    cmd_args = NULL;
-
-                    cmd_type = END_TRANS_TYPE;
-                }
-                return 1;
-                break;
-            default:
-                break;
+                case LINHA_TYPE: // Envia o argumento da linha
+                    linha_type_handler(kpckt_send, event_type);
+                    return 1;
+                case LINHAS_TYPE: // Envia o argumento das linhas
+                    linhas_type_handler(kpckt_send, event_type);
+                    return 1;
+                case EDIT_TYPE: // Envia o argumento da linha
+                    edit_type_handler(kpckt_send, event_type);
+                    return 1;
+                case BUF_TYPE: // Envia dados para o servidor
+                    buf_type_handler(kpckt_send, event_type);
+                    return 1;
+                case COMPILAR_TYPE: // Envia as opções/flags do compilador
+                    compilar_type_handler(kpckt_send, event_type);
+                    return 1;
+                case LINHA_ARG_TYPE:
+                case VER_TYPE:
+                    printf("\n");
+                    return 0;
+                default:
+                    return 0;
             }
-            return 0;
         }
         else if (kpckt_recv->type == ERROR_TYPE)
         {
-            int *value = (int *)kpckt_recv->msg;
+            int *value = (int *)kpckt_recv->data;
             switch (*value)
             {
-            case NO_PERM:
-                fprintf(stderr, "[Client] error: permission denied\n");
-                break;
-            case NO_DIR:
-                fprintf(stderr, "[Client] error: directory does not exist\n");
-                break;
-            case NO_ARQ:
-                fprintf(stderr, "[Client] error: file does not exist\n");
-                break;
-            default:
-                break;
+                case NO_PERM:
+                    fprintf(stderr, "[Client] error: permission denied\n");
+                    break;
+                case NO_DIR:
+                    fprintf(stderr, "[Client] error: directory does not exist\n");
+                    break;
+                case NO_ARQ:
+                    fprintf(stderr, "[Client] error: file does not exist\n");
+                    break;
+                case NO_LINE:
+                    fprintf(stderr, "[Client] error: line does not exist\n");
+                    break;
+                default:
+                    break;
             }
             return 0;
         }
         else if (kpckt_recv->type == LS_CONTENT_TYPE || kpckt_recv->type == ARQ_CONTENT_TYPE)
-        {
-            printf("%s", kpckt_recv->msg);
-        }
+            printf("%s", kpckt_recv->data);
 
-        if (kpckt_recv->type != NACK_TYPE)
+        if (kpckt_recv->type != NACK_TYPE) // Envia um ACK se recebeu algo com sucesso
         {
             seq_send++;
             gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
@@ -462,6 +442,87 @@ int kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
         gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
     }
     return 1;
+}
+
+void linha_type_handler(kermit_pckt_t *kpckt, int *event_type)
+{
+    seq_send++;
+    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, LINHA_ARG_TYPE,
+                    cmd_args[1], 1, sizeof(int));
+    free(cmd_args[1]);
+    cmd_args[1] = NULL;
+    free(cmd_args);
+    cmd_args = NULL;
+
+    *event_type = LINHA_ARG_TYPE;
+}
+
+void linhas_type_handler(kermit_pckt_t *kpckt, int *event_type)
+{
+    seq_send++;
+    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, LINHA_ARG_TYPE,
+                    cmd_args[1], 2, sizeof(int));
+    free(cmd_args[1]);
+    cmd_args[1] = NULL;
+    free(cmd_args);
+    cmd_args = NULL;
+
+    *event_type = LINHA_ARG_TYPE;
+}
+
+void edit_type_handler(kermit_pckt_t *kpckt, int *event_type)
+{
+    seq_send++;
+    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, LINHA_ARG_TYPE,
+                    cmd_args[1], 1, sizeof(int));
+    free(cmd_args[1]);
+    cmd_args[1] = NULL;
+
+    *event_type = BUF_TYPE;
+}
+
+void buf_type_handler(kermit_pckt_t *kpckt, int *event_type)
+{
+    seq_send++;
+    if (buf_ptr < strlen((const char *)cmd_args[2]))
+    {
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                        cmd_args[2] + buf_ptr, 1, strlen((const char *)(cmd_args[2] + buf_ptr)));
+        buf_ptr += DATA_SIZE;
+    }
+    else
+    {
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+
+        free(cmd_args[2]);
+        cmd_args[2] = NULL;
+        free(cmd_args);
+        cmd_args = NULL;
+
+        *event_type = END_TRANS_TYPE;
+    }
+}
+
+void compilar_type_handler(kermit_pckt_t *kpckt, int *event_type)
+{
+    seq_send++;
+    if (buf_ptr < strlen((const char *)cmd_args[1]))
+    {
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                        cmd_args[1] + buf_ptr, 1, strlen((const char *)(cmd_args[1] + buf_ptr)));
+        buf_ptr += DATA_SIZE;
+    }
+    else
+    {
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+
+        free(cmd_args[1]);
+        cmd_args[1] = NULL;
+        free(cmd_args);
+        cmd_args = NULL;
+
+        *event_type = END_TRANS_TYPE;
+    }
 }
 
 void client_close()

@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#include <sys/time.h>
 #include <net/ethernet.h>
 #include <linux/if_packet.h>
 #include <linux/if.h>
@@ -18,6 +17,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include "utils.h"
 
 // Códigos de erro
 #define ERROR_CODE -1
@@ -52,12 +52,5 @@ int sendto_rawsocket(int socket_fd, void *buf, size_t buf_size);
     @return Quantidade de bytes lidos
 */
 int recvfrom_rawsocket(int socket_fd, void *buf, size_t buf_size);
-
-/*!
-    @brief  Calcula o tempo corrente do programa
-
-    @return Tempo corrente em milissegundos 
-*/
-double timestamp();
 
 #endif

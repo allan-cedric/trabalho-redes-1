@@ -58,10 +58,3 @@ int recvfrom_rawsocket(int socket_fd, void *buf, size_t buf_size)
 {
   return recv(socket_fd, buf, buf_size, 0);
 }
-
-double timestamp()
-{
-  struct timeval tp;
-  gettimeofday(&tp, NULL);
-  return ((double)(tp.tv_sec * 1000.0 + tp.tv_usec / 1000.0));
-}
