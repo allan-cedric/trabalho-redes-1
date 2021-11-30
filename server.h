@@ -55,16 +55,62 @@ int valid_kpckt_for_server(kermit_pckt_t *kpckt);
 */
 void server_close();
 
+/*!
+    @brief  Função genérica para execução de rotinas de tratamento de comandos
+
+    @param  kpckt_recv  Pacote kermit recebido
+    @param  kpckt_send  Pacote resposta a ser gerado
+    @param  cmd_handler Rotina de tratamento de um comando
+*/
+void cmd_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send,
+               void (*cmd_handler)(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send));
+
+/*!
+    @brief  Tratamento do comando "ls"
+
+    @param  kpckt_recv  Pacote kermit recebido
+    @param  kpckt_send  Pacote resposta a ser gerado
+*/
 void ls_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
+/*!
+    @brief  Tratamento do comando "ver"
+
+    @param  kpckt_recv  Pacote kermit recebido
+    @param  kpckt_send  Pacote resposta a ser gerado
+*/
 void ver_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
+/*!
+    @brief  Tratamento do comando "linha"
+
+    @param  kpckt_recv  Pacote kermit recebido
+    @param  kpckt_send  Pacote resposta a ser gerado
+*/
 void linha_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
+/*!
+    @brief  Tratamento do comando "linhas"
+
+    @param  kpckt_recv  Pacote kermit recebido
+    @param  kpckt_send  Pacote resposta a ser gerado
+*/
 void linhas_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
+/*!
+    @brief  Tratamento do comando "edit"
+
+    @param  kpckt_recv  Pacote kermit recebido
+    @param  kpckt_send  Pacote resposta a ser gerado
+*/
 void edit_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
+/*!
+    @brief  Tratamento do comando "compilar"
+
+    @param  kpckt_recv  Pacote kermit recebido
+    @param  kpckt_send  Pacote resposta a ser gerado
+*/
 void compilar_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send);
 
 /*!

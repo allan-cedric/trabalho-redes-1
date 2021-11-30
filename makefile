@@ -4,7 +4,7 @@ CFLAGS = -Wall
 LIB_OBJS = kermit.o raw_socket.o utils.o
 
 LIB_OBJS_CLI = client.o
-LIB_OBJS_SER = server.o
+LIB_OBJS_SER = server.o server_handler.o
 
 LIB_OBJ_CLI_EXEC = main_client.o
 LIB_OBJ_SER_EXEC = main_server.o
