@@ -20,7 +20,8 @@ int read_client_input();
 /*!
     @brief  Lê um comando do cliente
 
-    @return Codificação inteira do comando, senão -1 caso o comando não exista
+    @return Codificação inteira do comando, 
+            senão -1 caso o comando não exista
 */
 int read_client_command();
 
@@ -46,7 +47,6 @@ int client_standalone_commands(int cmd_type);
     @brief  Cria um pacote kermit com base no comando inserido
     
     @param  kpckt       Pacote kermit a ser preenchido
-
     @param  cmd_type    Tipo do comando
 */
 void client_command_kermit_pckt(kermit_pckt_t *kpckt, int cmd_type);
@@ -61,7 +61,7 @@ void send_kpckt_to_server(kermit_pckt_t *kpckt);
 /*!
     @brief  Recebe uma resposta do servidor
 
-    @param  kpckt   Pacote kermit a ser recebido
+    @param  kpckt   Pacote kermit a ser preenchido
 
     @return 0 se recebeu com sucesso, senão 1 (timeout)
 */
@@ -70,7 +70,7 @@ int recv_kpckt_from_server(kermit_pckt_t *kpckt);
 /*!
     @brief  Verifica se o pacote kermit é válido para o cliente
 
-    @param  kpckt   Pacote kermit
+    @param  kpckt   Pacote kermit a ser verificado
 
     @return 1 se for um pacote válido, senão 0
 */
@@ -79,8 +79,8 @@ int valid_kpckt_for_client(kermit_pckt_t *kpckt);
 /*!
     @brief Decodifica e trata um pacote kermit recebido pelo cliente
 
-    @param kpckt_recv   Pacote a ser tratado
-    @param kpckt_send   Pacote de resposta
+    @param kpckt_recv   Pacote kermit a ser tratado
+    @param kpckt_send   Pacote kermit de resposta
     @param event_type   Tipo de evento a tratar
 
     @return 1 se precisa enviar o pacote resposta ao servidor, senão 0
@@ -88,41 +88,46 @@ int valid_kpckt_for_client(kermit_pckt_t *kpckt);
 int client_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send, int *event_type);
 
 /*!
-    @brief  Rotina que envia o argumento do comando "linha"
+    @brief  Rotina que gera o pacote kermit com o argumento 
+            do comando "linha"
 
-    @param  kpckt       Pacote kermit resposta
+    @param  kpckt       Pacote kermit de resposta
     @param  event_type  Evento a ser tratado
 */
 void linha_type_handler(kermit_pckt_t *kpckt, int *event_type);
 
 /*!
-    @brief  Rotina que envia o argumento do comando "linhas"
+    @brief  Rotina que gera o pacote kermit com o argumento 
+            do comando "linhas"
 
-    @param  kpckt       Pacote kermit resposta
+    @param  kpckt       Pacote kermit de resposta
     @param  event_type  Evento a ser tratado
 */
 void linhas_type_handler(kermit_pckt_t *kpckt, int *event_type);
 
 /*!
-    @brief  Rotina que envia o argumento linha do comando "edit"
+    @brief  Rotina que gera o pacote kermit com o argumento 
+            linha do comando "edit"
 
-    @param  kpckt       Pacote kermit resposta
+    @param  kpckt       Pacote kermit de resposta
     @param  event_type  Evento a ser tratado
 */
 void edit_type_handler(kermit_pckt_t *kpckt, int *event_type);
 
 /*!
-    @brief  Rotina que envia argumento textual do comando "edit"
-    /
-    @param  kpckt       Pacote kermit para resposta
+    @brief  Rotina que gera o pacote kermit com o argumento 
+            textual do comando "edit"
+
+    @param  kpckt       Pacote kermit de resposta
     @param  event_type  Evento a ser tratado
 */
 void buf_type_handler(kermit_pckt_t *kpckt, int *event_type);
 
 /*!
-    @brief  Rotina que envia argumento de opções/flags do comando "compilar"
+    @brief  Rotina que gera o pacote kermit com o argumento 
+            de opções/flags do comando "compilar"
 
-    @param  kpckt       Pacote kermit resposta
+    @param  kpckt       Pacote kermit de resposta
     @param  event_type  Evento a ser tratado
 */
 void compilar_type_handler(kermit_pckt_t *kpckt, int *event_type);

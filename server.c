@@ -77,32 +77,32 @@ void server_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     {
         switch (kpckt_recv->type)
         {
-        case CD_TYPE:
-            cd_handler(kpckt_recv, kpckt_send);
-            break;
-        case LS_TYPE:
-            ls_state(kpckt_recv, kpckt_send);
-            break;
-        case VER_TYPE:
-            ver_state(kpckt_recv, kpckt_send);
-            break;
-        case LINHA_TYPE:
-            linha_state(kpckt_recv, kpckt_send);
-            break;
-        case LINHAS_TYPE:
-            linhas_state(kpckt_recv, kpckt_send);
-            break;
-        case EDIT_TYPE:
-            edit_state(kpckt_recv, kpckt_send);
-            break;
-        case COMPILAR_TYPE:
-            compilar_state(kpckt_recv, kpckt_send);
-            break;
-        case NACK_TYPE:
-            send_kpckt_to_client(kpckt_send);
-            break;
-        default:
-            break;
+            case CD_TYPE:
+                cd_handler(kpckt_recv, kpckt_send);
+                break;
+            case LS_TYPE:
+                ls_state(kpckt_recv, kpckt_send);
+                break;
+            case VER_TYPE:
+                ver_state(kpckt_recv, kpckt_send);
+                break;
+            case LINHA_TYPE:
+                linha_state(kpckt_recv, kpckt_send);
+                break;
+            case LINHAS_TYPE:
+                linhas_state(kpckt_recv, kpckt_send);
+                break;
+            case EDIT_TYPE:
+                edit_state(kpckt_recv, kpckt_send);
+                break;
+            case COMPILAR_TYPE:
+                compilar_state(kpckt_recv, kpckt_send);
+                break;
+            case NACK_TYPE:
+                send_kpckt_to_client(kpckt_send);
+                break;
+            default:
+                break;
         }
     }
     else

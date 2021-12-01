@@ -1,3 +1,5 @@
+// Allan Cedric G. B. Alves da Silva - GRR20190351
+
 #include "kermit.h"
 
 void gen_kermit_pckt(kermit_pckt_t *kpckt, int dest_addr, int origin_addr,

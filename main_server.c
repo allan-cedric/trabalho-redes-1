@@ -1,3 +1,5 @@
+// Allan Cedric G. B. Alves da Silva - GRR20190351
+
 #include "server.h"
 
 int main()
@@ -8,14 +10,16 @@ int main()
 
     while (1)
     {
-        wait_kpckt_from_client(&pckt_recv);
+        wait_kpckt_from_client(&pckt_recv); // Espera o pacote de um cliente
         printf("[Server] Recv: ");
         print_kermit_pckt(&pckt_recv);
+        printf("\n");
 
-        server_kpckt_handler(&pckt_recv, &pckt_send);
+        server_kpckt_handler(&pckt_recv, &pckt_send); // Trata um pacote recebido
 
         printf("[Server] Send: ");
         print_kermit_pckt(&pckt_send);
+        printf("\n");
     }
 
     return 0;
