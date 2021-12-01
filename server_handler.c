@@ -174,6 +174,7 @@ void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
                     fclose(arq);
+                    arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
                 }
                 else
@@ -222,6 +223,7 @@ void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
                     fclose(arq);
+                    arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
                 }
                 else
@@ -272,6 +274,7 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 }
                 fscanf(arq, "%i", &arq_last_line);
                 fclose(arq);
+                arq = NULL;
 
                 int *line = (int *)(kpckt_recv->data); // Linha desejada
 
@@ -285,21 +288,19 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                         exit(1);
                     }
                     fread(buf, sizeof(byte_t), DATA_SIZE, arq);
+                }
 
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
-                                    buf, 1, strlen((const char *)buf));
-                }
-                else
-                {
-                    int error_code = NO_LINE;
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ERROR_TYPE,
-                                    &error_code, 1, sizeof(int));
-                }
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                                buf, 1, strlen((const char *)buf));
                 break;
             case ACK_TYPE: // Envia os dados de uma linha
-                if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
+                if (!arq || fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
-                    fclose(arq);
+                    if(arq)
+                    {
+                        fclose(arq);
+                        arq = NULL;
+                    }
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
                 }
                 else
@@ -349,13 +350,16 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 }
                 fscanf(arq, "%i", &arq_last_line);
                 fclose(arq);
+                arq = NULL;
 
                 int *init_line = (int *)(kpckt_recv->data); // Linha inicial desejada
                 int *last_line = (int *)(kpckt_recv->data + sizeof(int)); // Linha final desejada
 
-                if ((*init_line >= 1) && (*init_line <= arq_last_line) &&
-                    (*last_line >= 1)) // Existência da região
+                if ((*init_line >= 1) && (*init_line <= arq_last_line))
                 {
+                    if((*last_line < 1) || (*last_line > arq_last_line))
+                        *last_line = arq_last_line;
+
                     sprintf((char *)cmd_sed, "sed -n '%i,%ip;%iq' %s", *init_line, *last_line,
                             (*last_line) + 1, buf_arq);
 
@@ -367,22 +371,19 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                     }
 
                     fread(buf, sizeof(byte_t), DATA_SIZE, arq);
-
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
-                                    buf, 1, strlen((const char *)buf));
-                }
-                else
-                {
-                    int error_code = NO_LINE;
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ERROR_TYPE,
-                                    &error_code, 1, sizeof(int));
                 }
 
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ARQ_CONTENT_TYPE,
+                                buf, 1, strlen((const char *)buf));
                 break;
             case ACK_TYPE: // Envia os dados entre as linhas
-                if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
+                if (!arq || fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
-                    fclose(arq);
+                    if(arq)
+                    {
+                        fclose(arq);
+                        arq = NULL;
+                    }
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
                 }
                 else
@@ -420,6 +421,7 @@ void edit_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             exit(1);
         }
         fclose(arq);
+        arq = NULL;
 
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
     }
@@ -443,6 +445,7 @@ void edit_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 }
                 fscanf(arq, "%i", &last_line);
                 fclose(arq);
+                arq = NULL;
 
                 memcpy(&line, kpckt_recv->data, kpckt_recv->size);
 
@@ -513,6 +516,7 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 if (fread(buf_feedback, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
                     fclose(arq);
+                    arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
                 }
                 else
