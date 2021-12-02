@@ -6,11 +6,9 @@
 int socket_fd;
 
 // --- Variáveis de controle ---
-int is_from_nack = 0;      // Flag que indica se foi enviado um NACK
-void **cmd_args;           // Argumentos de um comando
-unsigned int seq_recv = 0; // Sequencialização
-int seq_send = 0;
-unsigned int buf_ptr = 0; // Ponteiro auxiliar para varrer dados de um buffer
+seq_t seq = {.recv = 0, .send = 0}; // Sequencialização
+void **cmd_args;                    // Argumentos de um comando
+unsigned int buf_ptr = 0;           // Ponteiro auxiliar para varrer dados de um buffer
 
 void clean_stdin()
 {
@@ -67,7 +65,7 @@ int read_client_command()
         return LINHAS_TYPE;
     else if (!strcmp("edit", (const char *)new_cmd))
         return EDIT_TYPE;
-    else if (!strcmp("compilar", (const char *)new_cmd))
+    else if (!strcmp("Compilar", (const char *)new_cmd))
         return COMPILAR_TYPE;
 
     clean_stdin();
@@ -297,7 +295,7 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt, int cmd_type)
     {
         case CD_TYPE:
         case VER_TYPE:
-            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
+            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, cmd_type, cmd_args[0], 1,
                             strlen((const char *)cmd_args[0]));
             free(cmd_args[0]);
             cmd_args[0] = NULL;
@@ -305,14 +303,14 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt, int cmd_type)
             cmd_args = NULL;
             break;
         case LS_TYPE:
-            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, NULL, 0, 0);
+            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, cmd_type, NULL, 0, 0);
             break;
         case LINHA_TYPE:
         case LINHAS_TYPE:
         case EDIT_TYPE:
         case COMPILAR_TYPE:
             buf_ptr = 0;
-            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, cmd_type, cmd_args[0], 1,
+            gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, cmd_type, cmd_args[0], 1,
                             strlen((const char *)cmd_args[0]));
             free(cmd_args[0]);
             cmd_args[0] = NULL;
@@ -320,7 +318,7 @@ void client_command_kermit_pckt(kermit_pckt_t *kpckt, int cmd_type)
         default:
             break;
     }
-    seq_send++;
+    seq.send++;
 }
 
 void send_kpckt_to_server(kermit_pckt_t *kpckt)
@@ -343,21 +341,17 @@ void send_kpckt_to_server(kermit_pckt_t *kpckt)
 int recv_kpckt_from_server(kermit_pckt_t *kpckt)
 {
     double send_time = timestamp();
+    int random_timeout = rand() % 100;
     while ((timestamp() - send_time) < TIMEOUT)
     {
         int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
-        if (ret > 0)
+        if (ret > 0 && random_timeout < 97)
         {
             if (valid_kpckt_for_client(kpckt))
             {
-                if (kpckt->seq == seq_recv) // Evita mensagens duplicadas em sequência
+                if (kpckt->seq == seq.recv) // Evita mensagens duplicadas em sequência
                 {
-                    seq_recv = (kpckt->seq + 1) % NUM_SEQ;
-                    return 0;
-                }
-                if (is_from_nack)
-                {
-                    is_from_nack = 0;
+                    seq.recv++;
                     return 0;
                 }
             }
@@ -429,24 +423,24 @@ int client_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send, i
 
         if (kpckt_recv->type != NACK_TYPE) // Envia um ACK se recebeu algo com sucesso
         {
-            gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, ACK_TYPE, NULL, 0, 0);
-            seq_send++;
+            gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+            seq.send++;
         }
     }
     else // Mensagem veio corrompida
     {
-        is_from_nack = 1;
-        gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
-        seq_send++;
+        seq.recv--;
+        gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq.send, NACK_TYPE, NULL, 0, 0);
+        seq.send++;
     }
     return 1;
 }
 
 void linha_type_handler(kermit_pckt_t *kpckt, int *event_type)
 {
-    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, LINHA_ARG_TYPE,
+    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, LINHA_ARG_TYPE,
                     cmd_args[1], 1, sizeof(int));
-    seq_send++;
+    seq.send++;
     
     free(cmd_args[1]);
     cmd_args[1] = NULL;
@@ -458,9 +452,9 @@ void linha_type_handler(kermit_pckt_t *kpckt, int *event_type)
 
 void linhas_type_handler(kermit_pckt_t *kpckt, int *event_type)
 {
-    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, LINHA_ARG_TYPE,
+    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, LINHA_ARG_TYPE,
                     cmd_args[1], 2, sizeof(int));
-    seq_send++;
+    seq.send++;
 
     free(cmd_args[1]);
     cmd_args[1] = NULL;
@@ -472,9 +466,9 @@ void linhas_type_handler(kermit_pckt_t *kpckt, int *event_type)
 
 void edit_type_handler(kermit_pckt_t *kpckt, int *event_type)
 {
-    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, LINHA_ARG_TYPE,
+    gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, LINHA_ARG_TYPE,
                     cmd_args[1], 1, sizeof(int));
-    seq_send++;
+    seq.send++;
 
     free(cmd_args[1]);
     cmd_args[1] = NULL;
@@ -486,13 +480,13 @@ void buf_type_handler(kermit_pckt_t *kpckt, int *event_type)
 {
     if (buf_ptr < strlen((const char *)cmd_args[2]))
     {
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, ARQ_CONTENT_TYPE,
                         cmd_args[2] + buf_ptr, 1, strlen((const char *)(cmd_args[2] + buf_ptr)));
         buf_ptr += DATA_SIZE;
     }
     else
     {
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
 
         free(cmd_args[2]);
         cmd_args[2] = NULL;
@@ -501,20 +495,20 @@ void buf_type_handler(kermit_pckt_t *kpckt, int *event_type)
 
         *event_type = END_TRANS_TYPE;
     }
-    seq_send++;
+    seq.send++;
 }
 
 void compilar_type_handler(kermit_pckt_t *kpckt, int *event_type)
 {
     if (buf_ptr < strlen((const char *)cmd_args[1]))
     {
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, ARQ_CONTENT_TYPE,
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, ARQ_CONTENT_TYPE,
                         cmd_args[1] + buf_ptr, 1, strlen((const char *)(cmd_args[1] + buf_ptr)));
         buf_ptr += DATA_SIZE;
     }
     else
     {
-        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq_send, END_TRANS_TYPE, NULL, 0, 0);
+        gen_kermit_pckt(kpckt, SER_ADDR, CLI_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
 
         free(cmd_args[1]);
         cmd_args[1] = NULL;
@@ -523,7 +517,7 @@ void compilar_type_handler(kermit_pckt_t *kpckt, int *event_type)
 
         *event_type = END_TRANS_TYPE;
     }
-    seq_send++;
+    seq.send++;
 }
 
 void client_close()

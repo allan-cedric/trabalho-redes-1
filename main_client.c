@@ -4,6 +4,8 @@
 
 int main()
 {
+    srand(time(NULL));
+
     kermit_pckt_t pckt_send, pckt_recv;
     int event_type;
 
@@ -31,7 +33,7 @@ int main()
 
             // Tratamento de timeout ou de uma resposta do servidor
             if (is_timeout)
-                fprintf(stderr, "[Client] timeout: sending back...\n");
+                continue;
             else if (!client_kpckt_handler(&pckt_recv, &pckt_send, &event_type))
                 break;
         }

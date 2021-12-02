@@ -6,8 +6,7 @@
 int socket_fd;
 
 // --- Variáveis de controle ---
-int is_from_nack = 0;                    // Flag que indica que foi enviado um NACK
-unsigned int seq_send = 0, seq_recv = 0; // Sequencialização
+seq_t seq = {.recv = 0, .send = 0}; // Sequencialização
 
 void server_init()
 {
@@ -28,14 +27,9 @@ void wait_kpckt_from_client(kermit_pckt_t *kpckt)
         {
             if (valid_kpckt_for_server(kpckt))
             {
-                if (kpckt->seq == seq_recv)
+                if (kpckt->seq == seq.recv)
                 {
-                    seq_recv = (kpckt->seq + 1) % NUM_SEQ;
-                    break;
-                }
-                if (is_from_nack)
-                {
-                    is_from_nack = 0;
+                    seq.recv++;
                     break;
                 }
             }
@@ -53,14 +47,9 @@ int recv_kpckt_from_client(kermit_pckt_t *kpckt)
         {
             if (valid_kpckt_for_server(kpckt))
             {
-                if (kpckt->seq == seq_recv)
+                if (kpckt->seq == seq.recv)
                 {
-                    seq_recv = (kpckt->seq + 1) % NUM_SEQ;
-                    return 0;
-                }
-                if (is_from_nack)
-                {
-                    is_from_nack = 0;
+                    seq.recv++;
                     return 0;
                 }
             }
@@ -107,10 +96,10 @@ void server_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     }
     else
     {
-        is_from_nack = 1;
-        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq_send, NACK_TYPE, NULL, 0, 0);
+        seq.recv--;
+        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, NACK_TYPE, NULL, 0, 0);
         send_kpckt_to_client(kpckt_send);
-        seq_send++;
+        seq.send++;
     }
 }
 

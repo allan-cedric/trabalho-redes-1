@@ -9,7 +9,7 @@
 #define BUF_SIZE (1024 + 1) // Tamanho para buffer auxiliares
 #define DATA_SIZE (15)      // Tamanho do campo de dados do pacote kermit
 
-#define TIMEOUT (5000) // ms
+#define TIMEOUT (2000) // ms
 
 // --- Códigos do protocolo ---
 
@@ -17,9 +17,6 @@
 #define INIT_MARKER (0x7E)
 #define CLI_ADDR (0x1)
 #define SER_ADDR (0x2)
-
-// Quantidade de seq. aceita pelo protocolo
-#define NUM_SEQ (0x10)
 
 // Códigos para o campo de tipo do pacote kermit
 #define CD_TYPE (0x0)
@@ -53,6 +50,13 @@
 #define NO_LINE (0x4)
 
 typedef unsigned char byte_t;
+
+// Estrutura para controlar o número de sequências das mensagens
+typedef struct seq_t
+{
+    byte_t recv : 4;
+    byte_t send : 4;
+} seq_t;
 
 // Estrutura de um pacote kermit
 typedef struct kermit_pckt_t
