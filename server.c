@@ -6,6 +6,7 @@
 int socket_fd;
 
 // --- Variáveis de controle ---
+int is_from_nack = 0;
 seq_t seq = {.recv = 0, .send = 0}; // Sequencialização
 
 void server_init()
@@ -33,6 +34,11 @@ void wait_kpckt_from_client(kermit_pckt_t *kpckt)
                     break;
                 }
             }
+            if(is_from_nack)
+            {
+                is_from_nack = 0;
+                return;
+            }
         }
     }
 }
@@ -52,6 +58,11 @@ int recv_kpckt_from_client(kermit_pckt_t *kpckt)
                     seq.recv++;
                     return 0;
                 }
+            }
+            if(is_from_nack)
+            {
+                is_from_nack = 0;
+                return 0;
             }
         }
     }
@@ -96,7 +107,7 @@ void server_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     }
     else
     {
-        seq.recv--;
+        is_from_nack = 1;
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, NACK_TYPE, NULL, 0, 0);
         send_kpckt_to_client(kpckt_send);
         seq.send++;

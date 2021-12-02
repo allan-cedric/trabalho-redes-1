@@ -2,6 +2,7 @@
 
 #include "server_handler.h"
 
+extern int is_from_nack;
 extern seq_t seq;
 FILE *arq; // Descritor de arquivo auxiliar
 
@@ -45,7 +46,7 @@ void cmd_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send,
             cmd_handler(kpckt_recv, kpckt_send);
         else
         {
-            seq.recv--;
+            is_from_nack = 1;
             gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, NACK_TYPE, NULL, 0, 0);
             seq.send++;
         }
@@ -177,7 +178,7 @@ void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
                 }
                 else
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
+                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, LS_CONTENT_TYPE,
                                     buf, 1, strlen((const char *)buf));
                 break;
             default:

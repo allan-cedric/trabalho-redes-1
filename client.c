@@ -6,6 +6,7 @@
 int socket_fd;
 
 // --- Variáveis de controle ---
+int is_from_nack = 0;               // Indica se foi enviado um NACK
 seq_t seq = {.recv = 0, .send = 0}; // Sequencialização
 void **cmd_args;                    // Argumentos de um comando
 unsigned int buf_ptr = 0;           // Ponteiro auxiliar para varrer dados de um buffer
@@ -345,7 +346,7 @@ int recv_kpckt_from_server(kermit_pckt_t *kpckt)
     while ((timestamp() - send_time) < TIMEOUT)
     {
         int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
-        if (ret > 0 && random_timeout < 97)
+        if (ret > 0 && random_timeout < TIMEOUT_PROB)
         {
             if (valid_kpckt_for_client(kpckt))
             {
@@ -354,6 +355,11 @@ int recv_kpckt_from_server(kermit_pckt_t *kpckt)
                     seq.recv++;
                     return 0;
                 }
+            }
+            if(is_from_nack)
+            {
+                is_from_nack = 0;
+                return 0;
             }
         }
     }
@@ -429,7 +435,7 @@ int client_kpckt_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send, i
     }
     else // Mensagem veio corrompida
     {
-        seq.recv--;
+        is_from_nack = 1;
         gen_kermit_pckt(kpckt_send, SER_ADDR, CLI_ADDR, seq.send, NACK_TYPE, NULL, 0, 0);
         seq.send++;
     }
