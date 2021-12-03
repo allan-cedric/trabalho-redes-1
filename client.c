@@ -10,6 +10,7 @@ int is_from_nack = 0;               // Indica se foi enviado um NACK
 seq_t seq = {.recv = 0, .send = 0}; // Sequencialização
 void **cmd_args;                    // Argumentos de um comando
 unsigned int buf_ptr = 0;           // Ponteiro auxiliar para varrer dados de um buffer
+unsigned int timeout_count = 0;     // Conta a quantidade de timeouts consecutivos
 
 void clean_stdin()
 {
@@ -353,15 +354,23 @@ int recv_kpckt_from_server(kermit_pckt_t *kpckt)
                 if (kpckt->seq == seq.recv) // Evita mensagens duplicadas em sequência
                 {
                     seq.recv++;
+                    timeout_count = 0;
+                    return 0;
+                }
+                if(is_from_nack)
+                {
+                    is_from_nack = 0;
+                    timeout_count = 0;
                     return 0;
                 }
             }
-            if(is_from_nack)
-            {
-                is_from_nack = 0;
-                return 0;
-            }
         }
+    }
+    if(timeout_count++ >= TIMEOUT_LIMIT)
+    {
+        seq.recv++;
+        timeout_count = 0;
+        return -1;
     }
     return 1;
 }

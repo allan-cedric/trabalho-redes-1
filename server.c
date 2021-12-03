@@ -6,8 +6,9 @@
 int socket_fd;
 
 // --- Variáveis de controle ---
-int is_from_nack = 0;
-seq_t seq = {.recv = 0, .send = 0}; // Sequencialização
+int is_from_nack = 0;                   // Indica se foi enviado um NACK
+unsigned int timeout_count = 0;         // Conta a quantidade de timeouts consecutivos
+seq_t seq = {.recv = 0, .send = 0};     // Sequencialização
 
 void server_init()
 {
@@ -33,11 +34,11 @@ void wait_kpckt_from_client(kermit_pckt_t *kpckt)
                     seq.recv++;
                     break;
                 }
-            }
-            if(is_from_nack)
-            {
-                is_from_nack = 0;
-                return;
+                if(is_from_nack)
+                {
+                    is_from_nack = 0;
+                    return;
+                }
             }
         }
     }
@@ -56,15 +57,23 @@ int recv_kpckt_from_client(kermit_pckt_t *kpckt)
                 if (kpckt->seq == seq.recv)
                 {
                     seq.recv++;
+                    timeout_count = 0;
+                    return 0;
+                }
+                if(is_from_nack)
+                {
+                    is_from_nack = 0;
+                    timeout_count = 0;
                     return 0;
                 }
             }
-            if(is_from_nack)
-            {
-                is_from_nack = 0;
-                return 0;
-            }
         }
+    }
+    if(timeout_count++ >= TIMEOUT_LIMIT)
+    {
+        seq.recv++;
+        timeout_count = 0;
+        return -1;
     }
     return 1;
 }

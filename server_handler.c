@@ -4,7 +4,8 @@
 
 extern int is_from_nack;
 extern seq_t seq;
-FILE *arq; // Descritor de arquivo auxiliar
+FILE *arq;      // Descritor de arquivo auxiliar
+int last_state; // Indica o último estado de tratamento de um comando
 
 // Procedimento auxiliar da biblioteca
 int end_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
@@ -12,12 +13,14 @@ int end_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     if (kpckt_send->type == ERROR_TYPE)
         return 1;
     return ((kpckt_send->type == ACK_TYPE) &&
-            (kpckt_recv->type == ACK_TYPE || kpckt_recv->type == END_TRANS_TYPE));
+            (kpckt_recv->type == ACK_TYPE || kpckt_recv->type == END_TRANS_TYPE ||
+             last_state == END_TRANS_TYPE));
 }
 
 void cmd_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send,
                void (*cmd_handler)(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send))
 {
+    last_state = -1;
     cmd_handler(kpckt_recv, kpckt_send);
     while (1)
     {
@@ -31,11 +34,12 @@ void cmd_state(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send,
         printf("\n");
 
         int is_timeout = recv_kpckt_from_client(kpckt_recv);
-        if (is_timeout)
+        if (is_timeout == 1)
         {
             fprintf(stderr, "[Server] timeout: sending back...\n");
             continue;
-        }
+        }else if(is_timeout == -1)
+            break;
 
         printf("[Server] Recv: ");
         print_kermit_pckt(kpckt_recv);
@@ -149,9 +153,9 @@ void cd_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
 void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 {
-    if (kpckt_recv->type == ACK_TYPE && kpckt_send->type == END_TRANS_TYPE)
+    if (kpckt_recv->type == ACK_TYPE && last_state == END_TRANS_TYPE)
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-    else
+    else if(last_state != END_TRANS_TYPE)
     {
         byte_t buf[DATA_SIZE + 1];
         memset(buf, 0, DATA_SIZE + 1);
@@ -169,6 +173,7 @@ void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, LS_CONTENT_TYPE,
                                 buf, 1, strlen((const char *)buf));
+                last_state = LS_CONTENT_TYPE;
                 break;
             case ACK_TYPE: // Envia as informações resultantes do comando "ls"
                 if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
@@ -176,6 +181,7 @@ void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                     fclose(arq);
                     arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
+                    last_state = END_TRANS_TYPE;
                 }
                 else
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, LS_CONTENT_TYPE,
@@ -192,9 +198,9 @@ void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
 void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 {
-    if (kpckt_recv->type == ACK_TYPE && kpckt_send->type == END_TRANS_TYPE)
+    if (kpckt_recv->type == ACK_TYPE && last_state == END_TRANS_TYPE)
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-    else
+    else if(last_state != END_TRANS_TYPE)
     {
         byte_t buf[DATA_SIZE + 1];
         memset(buf, 0, DATA_SIZE + 1);
@@ -216,6 +222,7 @@ void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
                                 buf, 1, strlen((const char *)buf));
+                last_state = ARQ_CONTENT_TYPE;
 
                 memset(buf, 0, DATA_SIZE + 1);
                 break;
@@ -225,6 +232,7 @@ void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                     fclose(arq);
                     arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
+                    last_state = END_TRANS_TYPE;
                 }
                 else
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
@@ -243,9 +251,9 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 {
     static byte_t buf_arq[DATA_SIZE + 1];
 
-    if (kpckt_recv->type == ACK_TYPE && kpckt_send->type == END_TRANS_TYPE)
+    if (kpckt_recv->type == ACK_TYPE && last_state == END_TRANS_TYPE)
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-    else
+    else if(last_state != END_TRANS_TYPE)
     {
         byte_t buf[DATA_SIZE + 1];
         memset(buf, 0, DATA_SIZE + 1);
@@ -261,6 +269,7 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 memset(buf_arq, 0, DATA_SIZE + 1);
                 memcpy(buf_arq, kpckt_recv->data, kpckt_recv->size);
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+                last_state = ACK_TYPE;
                 break;
             case LINHA_ARG_TYPE: // Recebe o parâmetro de linha, e começa a enviar os dados da linha
 
@@ -292,6 +301,7 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
                                 buf, 1, strlen((const char *)buf));
+                last_state = ARQ_CONTENT_TYPE;
                 break;
             case ACK_TYPE: // Envia os dados de uma linha
                 if (!arq || fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
@@ -302,6 +312,7 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                         arq = NULL;
                     }
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
+                    last_state = END_TRANS_TYPE;
                 }
                 else
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
@@ -319,9 +330,9 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 {
     static byte_t buf_arq[DATA_SIZE + 1];
 
-    if (kpckt_recv->type == ACK_TYPE && kpckt_send->type == END_TRANS_TYPE)
+    if (kpckt_recv->type == ACK_TYPE && last_state == END_TRANS_TYPE)
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-    else
+    else if(last_state != END_TRANS_TYPE)
     {
         byte_t buf[DATA_SIZE + 1];
         memset(buf, 0, DATA_SIZE + 1);
@@ -337,6 +348,7 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 memset(buf_arq, 0, DATA_SIZE + 1);
                 memcpy(buf_arq, kpckt_recv->data, kpckt_recv->size);
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+                last_state = ACK_TYPE;
                 break;
             case LINHA_ARG_TYPE: // Recebe os 2 parâmetros de linha, e começa a enviar os dados entre linhas
 
@@ -375,6 +387,7 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
                                 buf, 1, strlen((const char *)buf));
+                last_state = ARQ_CONTENT_TYPE;
                 break;
             case ACK_TYPE: // Envia os dados entre as linhas
                 if (!arq || fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
@@ -385,6 +398,7 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                         arq = NULL;
                     }
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
+                    last_state = END_TRANS_TYPE;
                 }
                 else
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
@@ -477,7 +491,7 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     byte_t buf_feedback[DATA_SIZE + 1];
     memset(buf_feedback, 0, DATA_SIZE + 1);
 
-    if (kpckt_recv->type == ACK_TYPE && kpckt_send->type == END_TRANS_TYPE) // Finalização
+    if (kpckt_recv->type == ACK_TYPE && last_state == END_TRANS_TYPE) // Finalização
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
     else if (kpckt_recv->type == END_TRANS_TYPE) // Compila o arquivo
     {
@@ -497,8 +511,9 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
                         buf_feedback, 1, strlen((const char *)buf_feedback));
+        last_state = ARQ_CONTENT_TYPE;
     }
-    else
+    else if(last_state != END_TRANS_TYPE)
     {
         switch (kpckt_recv->type)
         {
@@ -507,10 +522,12 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 memset(buf_opt, 0, BUF_SIZE);
                 memcpy(buf_arq, kpckt_recv->data, kpckt_recv->size);
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+                last_state = ACK_TYPE;
                 break;
             case ARQ_CONTENT_TYPE: // Recebe as opções/flags
                 memcpy(buf_opt + strlen((const char *)buf_opt), kpckt_recv->data, kpckt_recv->size);
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+                last_state = ACK_TYPE;
                 break;
             case ACK_TYPE: // Envia warnings/erros da compilação
                 if (fread(buf_feedback, sizeof(byte_t), DATA_SIZE, arq) < 1)
@@ -518,6 +535,7 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                     fclose(arq);
                     arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
+                    last_state = END_TRANS_TYPE;
                 }
                 else
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,

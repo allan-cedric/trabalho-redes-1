@@ -32,8 +32,10 @@ int main()
             int is_timeout = recv_kpckt_from_server(&pckt_recv);
 
             // Tratamento de timeout ou de uma resposta do servidor
-            if (is_timeout)
+            if (is_timeout == 1)
                 continue;
+            if (is_timeout == -1)
+                break;
             else if (!client_kpckt_handler(&pckt_recv, &pckt_send, &event_type))
                 break;
         }

@@ -11,6 +11,7 @@
 
 #define TIMEOUT (2000) // ms
 #define TIMEOUT_PROB (97) // %
+#define TIMEOUT_LIMIT (5)
 
 // --- Códigos do protocolo ---
 
