@@ -10,7 +10,7 @@
 #define DATA_SIZE (15)      // Tamanho do campo de dados do pacote kermit
 
 #define TIMEOUT (2000) // ms
-#define TIMEOUT_PROB (97) // %
+#define TIMEOUT_PROB (980) // %
 #define TIMEOUT_LIMIT (5)
 
 // --- Códigos do protocolo ---

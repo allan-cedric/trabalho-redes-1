@@ -33,7 +33,8 @@
 int rawsocket_connection(char *device);
 
 /*!
-    @brief Função wrapper da função send(). Envia uma mensagem para um raw socket.
+    @brief  Função wrapper da função send().
+            Envia buf_size bytes de buf para o socket.
 
     @param  socket_fd   Descritor do socket
     @param  buf         Buffer da mensagem
@@ -44,7 +45,8 @@ int rawsocket_connection(char *device);
 int sendto_rawsocket(int socket_fd, void *buf, size_t buf_size);
 
 /*!
-    @brief Função wrapper da função recv(). Recebe uma mensagem de um raw socket.
+    @brief  Função wrapper da função recv().
+            Lê buf_size bytes do socket, e coloca em buf.
 
     @param  socket_fd   Descritor do socket
     @param  buf         Buffer da mensagem

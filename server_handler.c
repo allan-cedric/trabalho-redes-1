@@ -223,8 +223,6 @@ void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
                                 buf, 1, strlen((const char *)buf));
                 last_state = ARQ_CONTENT_TYPE;
-
-                memset(buf, 0, DATA_SIZE + 1);
                 break;
             case ACK_TYPE: // Envia as informações resultantes do comando "ver"
                 if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
@@ -421,64 +419,60 @@ void edit_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
     byte_t cmd_sed[BUF_SIZE * 3];
     memset(cmd_sed, 0, BUF_SIZE * 3);
 
-    if (kpckt_recv->type == END_TRANS_TYPE) // Executa o comando "edit"
+    switch (kpckt_recv->type)
     {
-        if (line <= last_line)
-            sprintf((char *)cmd_sed, "sed -i '%i c\\%s\\' %s", line, buf_line, buf_arq);
-        else
-            sprintf((char *)cmd_sed, "sed -i '%i a\\%s\\' %s", last_line, buf_line, buf_arq);
+        case EDIT_TYPE: // Recebe o nome do arquivo
+            memset(buf_arq, 0, BUF_SIZE);
+            memset(buf_line, 0, BUF_SIZE);
+            memcpy(buf_arq, kpckt_recv->data, kpckt_recv->size);
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+            break;
+        case LINHA_ARG_TYPE: // Recebe a linha
+            sprintf((char *)cmd_sed, "sed -n '$=' %s", buf_arq);
+            arq = popen((const char *)cmd_sed, "r");
+            if (!arq)
+            {
+                fprintf(stderr, "error: popen\n");
+                exit(1);
+            }
+            fscanf(arq, "%i", &last_line);
+            fclose(arq);
+            arq = NULL;
 
-        arq = popen((const char *)cmd_sed, "r");
-        if (!arq)
-        {
-            fprintf(stderr, "error: popen\n");
-            exit(1);
-        }
-        fclose(arq);
-        arq = NULL;
+            memcpy(&line, kpckt_recv->data, kpckt_recv->size);
 
-        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-    }
-    else
-    {
-        switch (kpckt_recv->type)
-        {
-            case EDIT_TYPE: // Recebe o nome do arquivo
-                memset(buf_arq, 0, BUF_SIZE);
-                memset(buf_line, 0, BUF_SIZE);
-                memcpy(buf_arq, kpckt_recv->data, kpckt_recv->size);
+            if ((line >= 1) && (line <= last_line + 1)) // Existência da linha
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-                break;
-            case LINHA_ARG_TYPE: // Recebe a linha
-                sprintf((char *)cmd_sed, "sed -n '$=' %s", buf_arq);
-                arq = popen((const char *)cmd_sed, "r");
-                if (!arq)
-                {
-                    fprintf(stderr, "error: popen\n");
-                    exit(1);
-                }
-                fscanf(arq, "%i", &last_line);
-                fclose(arq);
-                arq = NULL;
+            else
+            {
+                int error_code = NO_LINE;
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ERROR_TYPE,
+                                &error_code, 1, sizeof(int));
+            }
+            break;
+        case ARQ_CONTENT_TYPE: // Recebe o conteúdo textual
+            memcpy(buf_line + strlen((const char *)buf_line), kpckt_recv->data, kpckt_recv->size);
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+            break;
+        case END_TRANS_TYPE:
+            if (line <= last_line)
+                sprintf((char *)cmd_sed, "sed -i '%i c\\%s\\' %s", line, buf_line, buf_arq);
+            else
+                sprintf((char *)cmd_sed, "sed -i '%i a\\%s\\' %s", last_line, buf_line, buf_arq);
 
-                memcpy(&line, kpckt_recv->data, kpckt_recv->size);
+            arq = popen((const char *)cmd_sed, "r");
+            if (!arq)
+            {
+                fprintf(stderr, "error: popen\n");
+                exit(1);
+            }
+            fclose(arq);
+            arq = NULL;
 
-                if ((line >= 1) && (line <= last_line + 1)) // Existência da linha
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-                else
-                {
-                    int error_code = NO_LINE;
-                    gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ERROR_TYPE,
-                                    &error_code, 1, sizeof(int));
-                }
-                break;
-            case ARQ_CONTENT_TYPE: // Recebe o conteúdo textual
-                memcpy(buf_line + strlen((const char *)buf_line), kpckt_recv->data, kpckt_recv->size);
-                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-                break;
-            default:
-                break;
-        }
+            gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
+            break;
+        default:
+            break;
     }
     if (kpckt_recv->type != NACK_TYPE)
         seq.send++;
@@ -493,28 +487,11 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
 
     if (kpckt_recv->type == ACK_TYPE && last_state == END_TRANS_TYPE) // Finalização
         gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
-    else if (kpckt_recv->type == END_TRANS_TYPE) // Compila o arquivo
+    else if(last_state != END_TRANS_TYPE)
     {
         byte_t cmd_gcc[BUF_SIZE * 3];
         memset(cmd_gcc, 0, BUF_SIZE * 3);
 
-        sprintf((char *)cmd_gcc, "gcc %s %s 2>&1 | cat", buf_opt, buf_arq);
-
-        arq = popen((const char *)cmd_gcc, "r");
-        if (!arq)
-        {
-            fprintf(stderr, "error: popen\n");
-            exit(1);
-        }
-
-        fread(buf_feedback, sizeof(byte_t), DATA_SIZE, arq);
-
-        gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
-                        buf_feedback, 1, strlen((const char *)buf_feedback));
-        last_state = ARQ_CONTENT_TYPE;
-    }
-    else if(last_state != END_TRANS_TYPE)
-    {
         switch (kpckt_recv->type)
         {
             case COMPILAR_TYPE: // Recebe o nome do arquivo
@@ -528,6 +505,21 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 memcpy(buf_opt + strlen((const char *)buf_opt), kpckt_recv->data, kpckt_recv->size);
                 gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
                 last_state = ACK_TYPE;
+                break;
+            case END_TRANS_TYPE: // Compila o arquivo
+                sprintf((char *)cmd_gcc, "gcc %s %s 2>&1 | cat", buf_opt, buf_arq);
+                arq = popen((const char *)cmd_gcc, "r");
+                if (!arq)
+                {
+                    fprintf(stderr, "error: popen\n");
+                    exit(1);
+                }
+
+                fread(buf_feedback, sizeof(byte_t), DATA_SIZE, arq);
+
+                gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ARQ_CONTENT_TYPE,
+                                buf_feedback, 1, strlen((const char *)buf_feedback));
+                last_state = ARQ_CONTENT_TYPE;
                 break;
             case ACK_TYPE: // Envia warnings/erros da compilação
                 if (fread(buf_feedback, sizeof(byte_t), DATA_SIZE, arq) < 1)

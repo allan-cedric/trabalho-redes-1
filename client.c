@@ -343,7 +343,7 @@ void send_kpckt_to_server(kermit_pckt_t *kpckt)
 int recv_kpckt_from_server(kermit_pckt_t *kpckt)
 {
     double send_time = timestamp();
-    int random_timeout = rand() % 100;
+    int random_timeout = rand() % 1000;
     while ((timestamp() - send_time) < TIMEOUT)
     {
         int ret = recvfrom_rawsocket(socket_fd, kpckt, sizeof(*kpckt));
