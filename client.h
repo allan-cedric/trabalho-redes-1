@@ -11,9 +11,9 @@
 void client_init();
 
 /*!
-    @brief Entrada de dados do cliente
+    @brief  Entrada de dados do cliente
 
-    @return Tipo do comando requisitado pelo cliente 
+    @return Codificação inteira do comando
 */
 int read_client_input();
 
@@ -125,7 +125,7 @@ void buf_type_handler(kermit_pckt_t *kpckt, int *event_type);
 
 /*!
     @brief  Rotina que gera o pacote kermit com o argumento 
-            de opções/flags do comando "compilar"
+            de opções/flags do comando "Compilar"
 
     @param  kpckt       Pacote kermit de resposta
     @param  event_type  Evento a ser tratado

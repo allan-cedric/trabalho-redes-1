@@ -37,7 +37,7 @@ void wait_kpckt_from_client(kermit_pckt_t *kpckt)
                 if(is_from_nack)
                 {
                     is_from_nack = 0;
-                    return;
+                    break;
                 }
             }
         }

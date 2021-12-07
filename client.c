@@ -9,7 +9,7 @@ int socket_fd;
 int is_from_nack = 0;               // Indica se foi enviado um NACK
 seq_t seq = {.recv = 0, .send = 0}; // Sequencialização
 void **cmd_args;                    // Argumentos de um comando
-unsigned int buf_ptr = 0;           // Ponteiro auxiliar para varrer dados de um buffer
+unsigned int buf_ptr = 0;           // Deslocamento auxiliar para varrer dados de um buffer
 unsigned int timeout_count = 0;     // Conta a quantidade de timeouts consecutivos
 
 void clean_stdin()
@@ -67,7 +67,7 @@ int read_client_command()
         return LINHAS_TYPE;
     else if (!strcmp("edit", (const char *)new_cmd))
         return EDIT_TYPE;
-    else if (!strcmp("Compilar", (const char *)new_cmd))
+    else if (!strcmp("compilar", (const char *)new_cmd))
         return COMPILAR_TYPE;
 
     clean_stdin();
@@ -284,7 +284,7 @@ int client_standalone_commands(int cmd_type)
         while (fgets((char *)buf, DATA_SIZE + 1, arq))
             printf("%s", buf);
 
-        fclose(arq);
+        pclose(arq);
 
         return 1;
     }

@@ -178,7 +178,7 @@ void ls_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             case ACK_TYPE: // Envia as informações resultantes do comando "ls"
                 if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
-                    fclose(arq);
+                    pclose(arq);
                     arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
                     last_state = END_TRANS_TYPE;
@@ -227,7 +227,7 @@ void ver_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             case ACK_TYPE: // Envia as informações resultantes do comando "ver"
                 if (fread(buf, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
-                    fclose(arq);
+                    pclose(arq);
                     arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
                     last_state = END_TRANS_TYPE;
@@ -280,7 +280,7 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                     exit(1);
                 }
                 fscanf(arq, "%i", &arq_last_line);
-                fclose(arq);
+                pclose(arq);
                 arq = NULL;
 
                 int *line = (int *)(kpckt_recv->data); // Linha desejada
@@ -306,7 +306,7 @@ void linha_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 {
                     if(arq)
                     {
-                        fclose(arq);
+                        pclose(arq);
                         arq = NULL;
                     }
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
@@ -359,7 +359,7 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                     exit(1);
                 }
                 fscanf(arq, "%i", &arq_last_line);
-                fclose(arq);
+                pclose(arq);
                 arq = NULL;
 
                 int *init_line = (int *)(kpckt_recv->data); // Linha inicial desejada
@@ -392,7 +392,7 @@ void linhas_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 {
                     if(arq)
                     {
-                        fclose(arq);
+                        pclose(arq);
                         arq = NULL;
                     }
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
@@ -436,7 +436,7 @@ void edit_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 exit(1);
             }
             fscanf(arq, "%i", &last_line);
-            fclose(arq);
+            pclose(arq);
             arq = NULL;
 
             memcpy(&line, kpckt_recv->data, kpckt_recv->size);
@@ -466,7 +466,7 @@ void edit_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
                 fprintf(stderr, "error: popen\n");
                 exit(1);
             }
-            fclose(arq);
+            pclose(arq);
             arq = NULL;
 
             gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, ACK_TYPE, NULL, 0, 0);
@@ -524,7 +524,7 @@ void compilar_handler(kermit_pckt_t *kpckt_recv, kermit_pckt_t *kpckt_send)
             case ACK_TYPE: // Envia warnings/erros da compilação
                 if (fread(buf_feedback, sizeof(byte_t), DATA_SIZE, arq) < 1)
                 {
-                    fclose(arq);
+                    pclose(arq);
                     arq = NULL;
                     gen_kermit_pckt(kpckt_send, CLI_ADDR, SER_ADDR, seq.send, END_TRANS_TYPE, NULL, 0, 0);
                     last_state = END_TRANS_TYPE;
