@@ -4,6 +4,12 @@
 
 int main()
 {
+    if(chdir("./server/"))
+    {
+        fprintf(stderr, "error to access server directory\n");
+        exit(EXIT_FAILURE);
+    }
+
     kermit_pckt_t pckt_send, pckt_recv;
 
     server_init();

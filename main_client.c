@@ -6,6 +6,12 @@ int main()
 {
     srand(time(NULL));
 
+    if(chdir("./client/"))
+    {
+        fprintf(stderr, "error to access client directory\n");
+        exit(EXIT_FAILURE);
+    }
+
     kermit_pckt_t pckt_send, pckt_recv;
     int event_type;
 

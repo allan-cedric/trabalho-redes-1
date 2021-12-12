@@ -3,3 +3,5 @@
 *.out
 client/
 server/
+main_client
+main_server
