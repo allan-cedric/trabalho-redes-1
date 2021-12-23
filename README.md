@@ -24,4 +24,4 @@
 
 ### Observações
 
-*   **ATENÇÃO: Esse trabalho foi desenvolvido para disiciplina de Redes de Computadores 1. Por essa razão, evite realizar plágio, pois além de prejudicar a si mesmo, está sabotando a própria oportunidade de aprender.**
+*   **ATENÇÃO: Esse trabalho foi desenvolvido para disciplina de Redes de Computadores 1. Por essa razão, evite realizar plágio, pois além de prejudicar a si mesmo, está sabotando a própria oportunidade de aprender.**
