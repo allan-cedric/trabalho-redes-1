@@ -21,3 +21,7 @@
 *   Abra dois terminais no diretório desse repositório, em um execute `sudo ./main_server` e em outro `sudo ./main_client`. A partir disso, o editor C remoto roda normalmente.
 
 *   Caso se interrompa ou aborte a execução de uma das aplicações, é necessário inicializá-las ambas novamente. Isso é devido ao fato da sequencialização esperada das mensagens entre as aplicações.
+
+### Observações
+
+*   **ATENÇÃO: Esse trabalho foi desenvolvido para disiciplina de Redes de Computadores 1. Por essa razão, evite realizar plágio, pois além de prejudicar a si mesmo, está sabotando a própria oportunidade de aprender.**
